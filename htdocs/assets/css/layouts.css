@@ -1,0 +1,422 @@
+/* ===== KUONIX LAYOUTS ===== */
+/* Page-specific layout styles */
+
+/* ===== HERO SECTION ===== */
+.hero-section {
+    height: 100vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    color: white;
+}
+
+.hero-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 120%;
+    background-image: url('../images/hero/aurora.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 1;
+    filter: brightness(0.6);
+}
+
+.hero-content {
+    z-index: 2;
+    text-align: center;
+    max-width: 800px;
+    padding: 0 var(--space-lg);
+}
+
+.hero-title {
+    font-size: 6rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    opacity: 0;
+    transform: translateY(50px);
+}
+
+.hero-subtitle {
+    font-size: 1.5rem;
+    font-weight: 300;
+    opacity: 0;
+    transform: translateY(30px);
+    color: rgba(255,255,255,0.9);
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 3rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.2rem;
+    }
+}
+
+/* ===== SECTION HEADER ===== */
+.section-header {
+    margin-bottom: 4rem;
+    text-align: center;
+}
+
+.section-header h2 {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+}
+
+/* ===== BENTO GRID ===== */
+.hook-section {
+    padding: 8rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(2, 400px);
+    gap: 1.5rem;
+}
+
+.card-large { grid-column: span 7; }
+.card-tall { 
+    grid-column: span 5;
+    grid-row: span 2;
+    background: #1a1a1a;
+    color: white;
+}
+.card-tall p { color: #888; }
+.card-small { grid-column: span 7; }
+
+@media (max-width: 1024px) {
+    .bento-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+    }
+    
+    .card-large,
+    .card-tall,
+    .card-small {
+        grid-column: span 1;
+        grid-row: span 1;
+        min-height: 300px;
+    }
+}
+
+/* ===== HORIZONTAL WORKFLOW ===== */
+.workflow-section {
+    height: 100vh;
+    width: 100%;
+    display: flex;
+    background: #111;
+    color: white;
+    overflow: hidden;
+}
+
+.workflow-container {
+    display: flex;
+    flex-wrap: nowrap;
+    height: 100%;
+    width: 100vw;
+}
+
+.workflow-step {
+    width: 100vw;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    border-right: 1px solid rgba(255,255,255,0.1);
+    position: relative;
+}
+
+.step-content {
+    display: flex;
+    gap: 4rem;
+    align-items: center;
+    max-width: 1200px;
+}
+
+.step-text { flex: 1; }
+.step-text h3 {
+    font-size: 4rem;
+    color: var(--accent-cyan);
+    margin-bottom: 1rem;
+}
+.step-text h4 {
+    font-size: 2.5rem;
+    margin-bottom: 1.5rem;
+}
+.step-text p {
+    color: #ccc;
+}
+
+.step-visual {
+    flex: 1.5;
+    height: 500px;
+    background: #222;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: relative;
+}
+
+.step-visual img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (max-width: 1024px) {
+    .workflow-section {
+        height: auto;
+    }
+    
+    .workflow-container {
+        flex-direction: column;
+    }
+    
+    .workflow-step {
+        width: 100%;
+        padding: 3rem 1.5rem;
+    }
+    
+    .step-content {
+        flex-direction: column;
+    }
+    
+    .step-text h3 {
+        font-size: 2.5rem;
+    }
+    
+    .step-text h4 {
+        font-size: 1.8rem;
+    }
+}
+
+/* ===== GALLERY ===== */
+.gallery-section {
+    padding: 8rem 2rem;
+    background: var(--card-bg);
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto 6rem;
+}
+
+.gallery-img {
+    height: 600px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    position: relative;
+}
+
+.gallery-img img {
+    transition: transform 1s ease;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gallery-img:hover img {
+    transform: scale(1.05);
+}
+
+@media (max-width: 768px) {
+    .gallery-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .gallery-img {
+        height: 400px;
+    }
+}
+
+/* ===== CTA BOX ===== */
+.cta-box {
+    text-align: center;
+    padding: 6rem;
+    background: var(--accent-cyan);
+    border-radius: var(--radius-lg);
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.cta-box h2 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+.cta-box p {
+    color: rgba(0,0,0,0.6);
+}
+
+@media (max-width: 768px) {
+    .cta-box {
+        padding: 3rem 1.5rem;
+    }
+    
+    .cta-box h2 {
+        font-size: 2rem;
+    }
+}
+
+/* ===== GUIDE PAGE LAYOUTS ===== */
+.guide-hero {
+    padding: 180px 3rem 6rem;
+    background: linear-gradient(135deg, var(--pearl-bg) 0%, #ffffff 100%);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.guide-hero h1 {
+    font-size: 4rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.03em;
+}
+
+.guide-hero p {
+    font-size: 1.4rem;
+    max-width: 800px;
+    color: var(--text-muted);
+}
+
+.guide-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 4rem 3rem;
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 4rem;
+}
+
+.guide-content {
+    padding-right: 2rem;
+}
+
+.content-section {
+    margin-bottom: 5rem;
+    scroll-margin-top: 120px;
+}
+
+.section-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.section-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+    color: var(--text-main);
+}
+
+.subsection {
+    margin: 3rem 0;
+    padding: 2rem;
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    border-left: 4px solid var(--accent-cyan);
+}
+
+.subsection-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    margin: 2rem 0;
+}
+
+.workflow-diagram {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 3rem 0;
+    position: relative;
+}
+
+.workflow-diagram::before {
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent-cyan);
+    z-index: 1;
+}
+
+.workflow-diagram .workflow-step {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    width: 150px;
+    background: transparent;
+    height: auto;
+    padding: 0;
+    border: none;
+    color: var(--text-main);
+}
+
+.step-number {
+    width: 80px;
+    height: 80px;
+    background: var(--accent-cyan);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 0 auto 1rem;
+}
+
+@media (max-width: 1024px) {
+    .guide-hero {
+        padding: 140px 1.5rem 4rem;
+    }
+    
+    .guide-hero h1 {
+        font-size: 2.5rem;
+    }
+    
+    .guide-container {
+        grid-template-columns: 1fr;
+        padding: 2rem 1.5rem;
+    }
+    
+    .guide-sidebar {
+        position: static !important;
+        margin-bottom: 3rem;
+    }
+    
+    .workflow-diagram {
+        flex-direction: column;
+        gap: 2rem;
+    }
+    
+    .workflow-diagram::before {
+        display: none;
+    }
+}
