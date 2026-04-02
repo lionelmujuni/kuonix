@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="description" content="KUONIX User Guide. Learn the production workflow, issue classification model, Color Lab algorithms, and system routing strategy behind the platform.">
+    <meta name="keywords" content="KUONIX guide, photo workflow documentation, color correction guide, RAW triage software">
+    <meta name="author" content="KUONIX">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kuonix.app/guide.html">
+    <meta property="og:title" content="KUONIX User Guide | Workflow, Diagnostics, and Color Lab">
+    <meta property="og:description" content="A production-level guide to intake, analysis, Color Lab algorithms, export routing, and system setup inside KUONIX.">
+    <meta property="og:image" content="https://kuonix.app/assets/images/hero/aurora.png">
+
+    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+
+    <title>KUONIX | User Guide</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="preload" href="assets/css/main.css" as="style">
+
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/layouts.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"
+            integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg=="
+            crossorigin="anonymous"
+            defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"
+            integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg=="
+            crossorigin="anonymous"
+            defer></script>
+    <script type="module" src="assets/js/main.js"></script>
+</head>
+<body class="guide-page">
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+    <nav aria-label="Main navigation" role="navigation">
+        <h1 class="logo" aria-label="KUONIX Home">
+            <a href="index.html" class="logo-link logo-link--ghost" aria-label="KUONIX Home"></a>
+        </h1>
+        <ul class="nav-links" role="list">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="guide.html" class="nav-link current-page" aria-current="page">User Guide</a></li>
+            <li><a href="index.html#download" class="nav-link">Download</a></li>
+        </ul>
+    </nav>
+
+    <main id="main-content">
+        <section class="guide-hero guide-hero--premium">
+            <div class="guide-hero__content">
+                <p class="eyebrow">System Guide</p>
+                <h1>Production documentation for the Kuonix pipeline.</h1>
+                <p>Use this guide to understand how jobs move through staging, classification, Color Lab, and native export so the platform behaves like a disciplined part of the studio workflow.</p>
+            </div>
+            <div class="guide-hero__panel tech-panel" data-reveal="up">
+                <div class="panel-header">
+                    <span class="panel-dot"></span>
+                    <span class="panel-title">Operator View</span>
+                    <span class="panel-meta">Guide Mode</span>
+                </div>
+                <div class="guide-hero__stats">
+                    <div><strong>01</strong><span>Staging</span></div>
+                    <div><strong>02</strong><span>Library</span></div>
+                    <div><strong>03</strong><span>Color Lab</span></div>
+                    <div><strong>04</strong><span>Export</span></div>
+                </div>
+            </div>
+        </section>
+
+        <div class="guide-container">
+            <aside class="guide-sidebar">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Overview</h3>
+                    <ul class="sidebar-links">
+                        <li><a href="#workflow-model" class="active">Workflow Model</a></li>
+                        <li><a href="#staging">Staging and Intake</a></li>
+                        <li><a href="#library">Library</a></li>
+                        <li><a href="#color-lab">Color Lab</a></li>
+                        <li><a href="#export-settings">Export and Settings</a></li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Reference</h3>
+                    <ul class="sidebar-links">
+                        <li><a href="#issue-taxonomy">Issue Taxonomy</a></li>
+                        <li><a href="#algorithms">Algorithms</a></li>
+                        <li><a href="#operations">Operating Notes</a></li>
+                    </ul>
+                </div>
+            </aside>
+
+            <div class="guide-content">
+                <section id="workflow-model" class="content-section">
+                    <div class="section-header section-header--left reveal-on-scroll">
+                        <p class="eyebrow">Workflow Model</p>
+                        <h2 class="section-title">What Kuonix is actually doing in the stack.</h2>
+                        <p>Kuonix is not a full replacement editor. It is a technical front-end that ingests volume, detects faults, groups work by correction need, and hands off organized sets to finishing software.</p>
+                    </div>
+
+                    <div class="feature-grid">
+                        <article class="feature-card feature-card--premium" data-reveal="up">
+                            <h4>Staging</h4>
+                            <p>Bring in full shoots, preview what arrived, and remove unwanted frames before the engine starts classifying them.</p>
+                        </article>
+                        <article class="feature-card feature-card--premium" data-reveal="up">
+                            <h4>Classification</h4>
+                            <p>Images are grouped by measurable technical defects, not by a vague aesthetic score or metadata assumption.</p>
+                        </article>
+                        <article class="feature-card feature-card--premium" data-reveal="up">
+                            <h4>Correction</h4>
+                            <p>Color Lab provides targeted algorithms for balancing, exposure alignment, saturation work, and reference matching.</p>
+                        </article>
+                        <article class="feature-card feature-card--premium" data-reveal="up">
+                            <h4>Routing</h4>
+                            <p>Export opens folders in native tools so final creative work stays in the editor your team already uses.</p>
+                        </article>
+                    </div>
+                </section>
+
+                <section id="staging" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Staging and Intake</h3>
+                        <p>The Upload and Analyze page is where the system takes control of a session. This phase is about keeping bad files out, making large jobs manageable, and getting a clean queue ready for automated review.</p>
+
+                        <div class="workflow-diagram workflow-diagram--premium">
+                            <div class="workflow-step">
+                                <div class="step-number">1</div>
+                                <h4>Import</h4>
+                                <p>Drop complete shoots into the staging area or browse from local storage.</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">2</div>
+                                <h4>Preview</h4>
+                                <p>Verify what arrived before committing the engine to a full classification pass.</p>
+                            </div>
+                            <div class="workflow-step">
+                                <div class="step-number">3</div>
+                                <h4>Cull</h4>
+                                <p>Remove obvious misses, duplicates, or unusable frames before processing starts.</p>
+                            </div>
+                        </div>
+
+                        <div class="guide-shell">
+                            <div class="guide-shell__header">
+                                <span>Upload Session</span>
+                                <span>Queue Integrity: Stable</span>
+                            </div>
+                            <div class="guide-shell__body">
+                                <div class="guide-shell__dropzone">Drop photos here or choose a source directory</div>
+                                <div class="guide-shell__thumbs">
+                                    <img src="assets/images/gallery/baker.jpg" alt="Upload preview thumbnail">
+                                    <img src="assets/images/gallery/street.jpg" alt="Upload preview thumbnail">
+                                    <img src="assets/images/gallery/flower.jpg" alt="Upload preview thumbnail">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="library" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Library</h3>
+                        <p>The Library view functions as a controlled review surface for everything that has been ingested. Operators can see thumbnails, issue labels, and batch-select images that need a common correction path.</p>
+
+                        <div class="feature-grid">
+                            <article class="feature-card feature-card--premium">
+                                <h4>Grid Review</h4>
+                                <p>Visual thumbnails keep the operator oriented while issue tags expose what the engine has already detected.</p>
+                            </article>
+                            <article class="feature-card feature-card--premium">
+                                <h4>Selection Logic</h4>
+                                <p>Bulk selection tools make it practical to move large image groups into Color Lab or export subsets by defect type.</p>
+                            </article>
+                            <article class="feature-card feature-card--premium">
+                                <h4>Action Surface</h4>
+                                <p>Delete, isolate, and send to correction workflows without bouncing between multiple tools or folders.</p>
+                            </article>
+                            <article class="feature-card feature-card--premium">
+                                <h4>Issue Visibility</h4>
+                                <p>Classification stays attached to the image, which removes ambiguity when teams return to a job later.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="color-lab" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Color Lab</h3>
+                        <p>Color Lab is the system’s precision bay. It exists for cases where classification has identified a known technical problem and the operator wants targeted correction tools instead of starting from scratch.</p>
+
+                        <div class="lab-preview">
+                            <div class="lab-preview__pane">
+                                <span>Before</span>
+                                <img src="assets/images/gallery/transfer.jpg" alt="Before view in Color Lab">
+                            </div>
+                            <div class="lab-preview__divider"></div>
+                            <div class="lab-preview__pane">
+                                <span>After</span>
+                                <img src="assets/images/gallery/on car.jpg" alt="After view in Color Lab">
+                            </div>
+                        </div>
+
+                        <div id="algorithms" class="algorithm-grid">
+                            <article class="algorithm-card">
+                                <h4>Gray World</h4>
+                                <p>Neutralizes white balance by assuming average scene color should approach gray.</p>
+                            </article>
+                            <article class="algorithm-card">
+                                <h4>White Patch</h4>
+                                <p>Uses the brightest region as a white reference when a clean highlight exists.</p>
+                            </article>
+                            <article class="algorithm-card">
+                                <h4>Shades of Gray</h4>
+                                <p>Extends white balance correction through a stronger p-norm approach for more demanding scenes.</p>
+                            </article>
+                            <article class="algorithm-card">
+                                <h4>Exposure Adjustment</h4>
+                                <p>Applies controlled global gain to repair frames that are uniformly dark or bright.</p>
+                            </article>
+                            <article class="algorithm-card">
+                                <h4>Saturation Control</h4>
+                                <p>Boosts or tamps down color intensity where the issue is global and obvious.</p>
+                            </article>
+                            <article class="algorithm-card">
+                                <h4>Color Matrix Transform</h4>
+                                <p>Supports deeper channel transforms for stylized grading and space conversion work.</p>
+                            </article>
+                            <article class="algorithm-card algorithm-card--highlight">
+                                <h4>Color Distribution Alignment</h4>
+                                <p>Matches target images to a reference look in LAB space, which is critical for consistency across multi-camera sets.</p>
+                            </article>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="issue-taxonomy" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Issue Taxonomy</h3>
+                        <p>The value of the platform depends on issue categories being useful to the editor, not just mathematically interesting. Each class should lead to an obvious next action.</p>
+
+                        <div class="taxonomy-grid">
+                            <div><strong>Exposure</strong><span>Under / Over</span></div>
+                            <div><strong>Contrast</strong><span>Low / High</span></div>
+                            <div><strong>Saturation</strong><span>Dull / Oversaturated / Channel shift</span></div>
+                            <div><strong>Color Cast</strong><span>Blue / Yellow / Green / Cyan / Magenta / Red</span></div>
+                            <div><strong>Noise</strong><span>Shadow contamination</span></div>
+                            <div><strong>Routing</strong><span>Group by correction intent</span></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="export-settings" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Export and Settings</h3>
+                        <p>Export is where technical organization becomes operational value. Images can be routed into folders by issue type, then opened directly in the software responsible for the finishing pass.</p>
+
+                        <div class="settings-grid">
+                            <div class="settings-card">
+                                <span class="settings-card__label">Executable Path</span>
+                                <strong>C:\Program Files\Adobe\Photoshop\photoshop.exe</strong>
+                            </div>
+                            <div class="settings-card">
+                                <span class="settings-card__label">Launch Mode</span>
+                                <strong>Standard or Admin</strong>
+                            </div>
+                            <div class="settings-card">
+                                <span class="settings-card__label">Folder Strategy</span>
+                                <strong>Sort by issue class or correction lane</strong>
+                            </div>
+                            <div class="settings-card">
+                                <span class="settings-card__label">Use Case</span>
+                                <strong>Open grouped folders directly in the finisher</strong>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="operations" class="content-section">
+                    <div class="subsection subsection--premium" data-reveal="up">
+                        <h3 class="subsection-title">Operating Notes</h3>
+                        <div class="operations-list">
+                            <p><strong>Keep intake clean.</strong> The best automation results come from killing obvious misses before batch analysis starts.</p>
+                            <p><strong>Use issue classes as work queues.</strong> The taxonomy exists to reduce context switching during correction.</p>
+                            <p><strong>Reserve Color Lab for deliberate passes.</strong> It is strongest when paired with classification, not used blindly across every frame.</p>
+                            <p><strong>Keep finishing in native tools.</strong> Kuonix adds structure and speed; the final look still belongs in the editor.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="site-footer" role="contentinfo">
+        <p>&copy; 2026 KUONIX. Imaging intelligence for production photographers.</p>
+    </footer>
+</body>
+</html>

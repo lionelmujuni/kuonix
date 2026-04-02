@@ -1,0 +1,238 @@
+/* ===== KUONIX COMPONENTS ===== */
+/* Reusable UI components: Navigation, Buttons, Cards */
+
+/* ===== NAVIGATION ===== */
+nav {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    padding: 0.85rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: var(--z-nav);
+    background: transparent;
+    color: var(--text-main);
+    transition: background var(--transition-base), box-shadow var(--transition-base), padding var(--transition-base), color var(--transition-base);
+}
+
+nav.scrolled {
+    background: rgba(7, 12, 18, 0.88);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+    color: white;
+}
+
+nav.blend-mode {
+    mix-blend-mode: difference;
+    color: white;
+}
+
+.logo {
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: -1px;
+}
+
+.logo a {
+    color: inherit;
+}
+
+.nav-links {
+    display: flex;
+    gap: 3rem;
+    list-style: none;
+}
+
+.nav-link {
+    font-weight: 500;
+    transition: color var(--transition-base);
+}
+
+.nav-link:hover,
+.nav-link.current-page {
+    color: var(--accent-cyan);
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+    display: inline-block;
+    padding: 1rem 2rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base), background var(--transition-base), color var(--transition-base);
+    border: none;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.btn--primary {
+    background: var(--accent-cyan);
+    color: white;
+}
+
+.btn--primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px var(--accent-glow);
+}
+
+.btn--secondary {
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--text-main);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.btn--secondary:hover {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.btn--ghost-dark {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-main);
+    border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.btn--ghost-dark:hover {
+    background: rgba(0, 0, 0, 0.14);
+    border-color: rgba(0, 0, 0, 0.24);
+}
+
+.btn--sm {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+}
+
+.btn--lg {
+    padding: 1.05rem 1.8rem;
+    font-size: 0.98rem;
+}
+
+.cta-btn {
+    display: inline-block;
+    margin-top: 2rem;
+    padding: 1.2rem 3rem;
+    background: var(--text-main);
+    color: white;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.cta-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.cta-btn--pulse {
+    position: relative;
+    overflow: visible;
+}
+
+.cta-btn--pulse::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    border: 2px solid rgba(17, 17, 17, 0.35);
+    opacity: 0;
+    animation: cta-ring 2.4s ease-out infinite;
+    pointer-events: none;
+}
+
+@keyframes cta-ring {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cta-btn--pulse::after {
+        animation: none;
+    }
+}
+
+/* ===== CARDS ===== */
+.bento-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.bento-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--accent-cyan);
+}
+
+.bento-card h3 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.bento-card p {
+    font-size: 1rem;
+}
+
+.feature-card {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.feature-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05);
+}
+
+.feature-card h4 {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+    color: var(--text-main);
+}
+
+/* ===== SMALL UTILITIES ===== */
+.code-block {
+    background: #1a1a1a;
+    color: #00ff00;
+    padding: 1.5rem;
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    margin: 1rem 0;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    nav {
+        padding: 1rem 1.1rem;
+    }
+
+    .nav-links {
+        gap: 0.9rem;
+        font-size: 0.82rem;
+    }
+
+    .btn,
+    .btn--lg {
+        width: 100%;
+    }
+}
