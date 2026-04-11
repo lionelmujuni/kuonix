@@ -4,7 +4,7 @@
  * No global pollution - all state contained in IIFE
  */
 
-window.addEventListener('DOMContentLoaded', () => {
+function initAgent() {
   // ===== DOM REFERENCES =====
   const appLayout = document.querySelector('.app-layout');
   const agentPanel = document.getElementById('agentPanel');
@@ -30,6 +30,7 @@ window.addEventListener('DOMContentLoaded', () => {
   let agentPanelWidth = 340;
   let isResizing = false;
   let selectedActionIndex = -1;
+  const AGENT_ENDPOINT = 'http://localhost:8081/agent/chat';
 
   // ===== QUICK ACTIONS LIST =====
   const quickActions = [
@@ -75,17 +76,6 @@ window.addEventListener('DOMContentLoaded', () => {
       action: () => {
         const fitBtn = document.getElementById('ccToolFit');
         if (fitBtn) fitBtn.click();
-        closeCommandBar();
-      }
-    },
-    {
-      id: 'fill-view',
-      label: 'Fill View',
-      icon: 'bi-bounding-box',
-      description: 'Expand image to fill container',
-      action: () => {
-        const fillBtn = document.getElementById('ccToolFill');
-        if (fillBtn) fillBtn.click();
         closeCommandBar();
       }
     },
@@ -165,7 +155,7 @@ window.addEventListener('DOMContentLoaded', () => {
       action: () => {
         const confirmed = confirm('Are you sure you want to clear all images?');
         if (confirmed) {
-          showToast('All images cleared', 'info');
+          notify('All images cleared', 'info');
           closeCommandBar();
         }
       }
@@ -257,6 +247,49 @@ window.addEventListener('DOMContentLoaded', () => {
     agentTyping_flag = false;
     agentTyping.style.display = 'none';
   }
+  
+  function notify(message, type = 'info') {
+    if (typeof window.showToast === 'function') {
+      window.showToast(message, type);
+      return;
+    }
+    console.log(`[agent:${type}] ${message}`);
+  }
+  
+  function localAgentFallback(userMessage, context) {
+    const msg = (userMessage || '').toLowerCase();
+    const actions = [];
+    let response = 'I can help with navigation, Color Lab tools, and workflow steps. Try asking: "open color lab", "zoom in", or "go to library".';
+    
+    if (msg.includes('color lab')) {
+      response = 'Opening Color Lab helps you run method-based corrections and compare before/after. I can open it from the command bar with Cmd+J.';
+      actions.push('Open Color Lab');
+    } else if (msg.includes('library')) {
+      response = 'Library is where you review and select images before sending them to Color Lab.';
+      actions.push('Go to Library');
+    } else if (msg.includes('upload')) {
+      response = 'Use Upload & Analyze to add files/folders and run issue detection before correction.';
+      actions.push('Upload Images');
+    } else if (msg.includes('fit')) {
+      response = 'Use Fit to preserve aspect ratio and avoid cropping. Whitespace can appear when aspect ratios differ.';
+      actions.push('Fit to View');
+    } else if (msg.includes('zoom')) {
+      response = 'Use Zoom In/Out in the Color Lab toolbar for manual framing.';
+      actions.push('Zoom In', 'Zoom Out');
+    } else if (msg.includes('before') || msg.includes('after') || msg.includes('compare')) {
+      response = 'Use Before/After to toggle between original and corrected output quickly.';
+      actions.push('Toggle Before/After');
+    } else if (msg.includes('settings') || msg.includes('theme')) {
+      response = 'Settings lets you toggle dark mode, set accent color, and configure export app paths.';
+      actions.push('Open Settings');
+    } else if (msg.includes('help')) {
+      response = 'I can guide you through upload, analysis, grouping, and color correction workflow step-by-step.';
+    } else if (context && context.view && context.view !== 'unknown') {
+      response = `You are currently in ${context.view.replace('-', ' ')}. Tell me what you want to do next and I will suggest exact actions.`;
+    }
+    
+    return { response, actions };
+  }
 
   // ===== AGENT API CALL =====
   async function sendAgentMessage(userMessage) {
@@ -271,28 +304,36 @@ window.addEventListener('DOMContentLoaded', () => {
 
     try {
       const context = getAgentContext();
-      const response = await fetch('http://localhost:8081/agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: userMessage,
-          context,
-          history: agentConversation.slice(-10)
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+      let data;
+      
+      try {
+        const response = await fetch(AGENT_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: userMessage,
+            context,
+            history: agentConversation.slice(-10)
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        data = await response.json();
+      } catch (backendError) {
+        console.warn('Agent backend unavailable, using local fallback:', backendError.message);
+        data = localAgentFallback(userMessage, context);
       }
-
-      const data = await response.json();
+      
       hideTypingIndicator();
       addMessage(data.response || data.message || 'No response', 'agent');
 
       // Handle suggested actions if provided
       if (data.actions && Array.isArray(data.actions)) {
         data.actions.forEach(action => {
-          showToast(`Suggested: ${action}`, 'info');
+          notify(`Suggested: ${action}`, 'info');
         });
       }
     } catch (error) {
@@ -511,4 +552,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Update context on view changes
   setInterval(updateContextBadge, 5000);
-});
+}
+
+// Call immediately if DOM is ready, otherwise wait
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAgent);
+} else {
+  initAgent();
+}
