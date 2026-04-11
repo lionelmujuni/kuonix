@@ -51,6 +51,13 @@ window.addEventListener('DOMContentLoaded', () => {
   const ccImagesGrid = document.getElementById('ccImagesGrid');
   const ccBackToGridBtn = document.getElementById('ccBackToGridBtn');
   const ccPreviewImageName = document.getElementById('ccPreviewImageName');
+  const ccToolZoomIn = document.getElementById('ccToolZoomIn');
+  const ccToolZoomOut = document.getElementById('ccToolZoomOut');
+  const ccToolFit = document.getElementById('ccToolFit');
+  const ccToolRotate = document.getElementById('ccToolRotate');
+  const ccToolCompare = document.getElementById('ccToolCompare');
+  const ccToolUndo = document.getElementById('ccToolUndo');
+  const ccToolRedo = document.getElementById('ccToolRedo');
   const ccToolGridView = document.getElementById('ccToolGridView');
   const ccToolPreviewView = document.getElementById('ccToolPreviewView');
   
@@ -82,6 +89,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Accent color settings
   const ACCENT_COLOR_KEY = 'accentColorSettings';
+  const CC_MIN_ZOOM = 0.1;
+  const CC_MAX_ZOOM = 5.0;
+  const CC_ZOOM_STEP = 0.1;
+  let ccZoomLevel = 1.0;
+  let ccRotationDeg = 0;
   
   loadExportSettings();
   loadAccentColor();
@@ -3146,6 +3158,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ccImageContainer.style.display = 'grid';
     ccOriginalImage.src = libraryImage.url;
     ccCorrectedImage.src = libraryImage.url;
+    resetPreviewTransform();
     updateSaveButtonStates();
 
     // Apply correction only if method is selected and doesn't require unfilled parameters
@@ -3453,6 +3466,7 @@ window.addEventListener('DOMContentLoaded', () => {
     ccOriginalImage.src = img.url || img.base64;
     ccImageContainer.style.display = 'grid';
     ccNoImage.style.display = 'none';
+    resetPreviewTransform();
     
     // Check if we have a correction result for this image
     if (ccCorrectionResults[img.path] && ccCorrectionResults[img.path].base64) {
@@ -3488,6 +3502,26 @@ window.addEventListener('DOMContentLoaded', () => {
     
     updateNavigationState();
     updateSaveButtonStates();
+  }
+  
+  function applyPreviewTransform() {
+    const transform = `scale(${ccZoomLevel}) rotate(${ccRotationDeg}deg)`;
+    [ccOriginalImage, ccCorrectedImage].forEach((img) => {
+      if (!img) return;
+      img.style.transformOrigin = 'center center';
+      img.style.transform = transform;
+    });
+  }
+  
+  function resetPreviewTransform() {
+    ccZoomLevel = 1.0;
+    ccRotationDeg = 0;
+    applyPreviewTransform();
+  }
+  
+  function updatePreviewZoom(nextZoom) {
+    ccZoomLevel = Math.min(CC_MAX_ZOOM, Math.max(CC_MIN_ZOOM, Number(nextZoom.toFixed(2))));
+    applyPreviewTransform();
   }
   
   // Clear Color Correction Lab
@@ -3625,6 +3659,50 @@ window.addEventListener('DOMContentLoaded', () => {
       } else {
         showToast('Add images from Your Library first', 'info');
       }
+    });
+  }
+  
+  // Zoom controls for Color Lab preview
+  if (ccToolZoomIn) {
+    ccToolZoomIn.addEventListener('click', () => {
+      updatePreviewZoom(ccZoomLevel + CC_ZOOM_STEP);
+    });
+  }
+  
+  if (ccToolZoomOut) {
+    ccToolZoomOut.addEventListener('click', () => {
+      updatePreviewZoom(ccZoomLevel - CC_ZOOM_STEP);
+    });
+  }
+  
+  if (ccToolFit) {
+    ccToolFit.addEventListener('click', () => {
+      resetPreviewTransform();
+    });
+  }
+  
+  if (ccToolRotate) {
+    ccToolRotate.addEventListener('click', () => {
+      ccRotationDeg = (ccRotationDeg + 90) % 360;
+      applyPreviewTransform();
+    });
+  }
+  
+  if (ccToolCompare) {
+    ccToolCompare.addEventListener('click', () => {
+      if (ccBeforeAfterToggle) ccBeforeAfterToggle.click();
+    });
+  }
+  
+  if (ccToolUndo) {
+    ccToolUndo.addEventListener('click', () => {
+      showToast('Undo is not available yet in Color Lab', 'info');
+    });
+  }
+  
+  if (ccToolRedo) {
+    ccToolRedo.addEventListener('click', () => {
+      showToast('Redo is not available yet in Color Lab', 'info');
     });
   }
   
