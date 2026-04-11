@@ -41,6 +41,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const ccMethodControls = document.getElementById('ccMethodControls');
   const ccTheoryContent = document.getElementById('ccTheoryContent');
   const ccSplitOverlay = document.getElementById('ccSplitOverlay');
+  const ccPreviewContainer = document.querySelector('.cc-preview-container');
   const ccPresetName = document.getElementById('ccPresetName');
   const ccSavePresetBtn = document.getElementById('ccSavePresetBtn');
   const ccPresetList = document.getElementById('ccPresetList');
@@ -94,6 +95,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const CC_ZOOM_STEP = 0.1;
   let ccZoomLevel = 1.0;
   let ccRotationDeg = 0;
+  let ccPreviewMode = 'fit';
   
   loadExportSettings();
   loadAccentColor();
@@ -2169,13 +2171,15 @@ window.addEventListener('DOMContentLoaded', () => {
             }];
             ccCurrentImageIndex = 0;
             ccCorrectionResults = {};
-            
+
             // Switch to Color Correction view
             showColorCorrectionView();
-            
+
+            // Show preview view first (container needs visible dimensions)
+            switchToPreviewView();
+
             // Load the image in preview mode (single image view)
             loadImageAtIndex(0);
-            switchToPreviewView();
             
             showToast(`Opened "${img.name}" in Color Correction Lab`, 'success');
           }
@@ -3467,7 +3471,15 @@ window.addEventListener('DOMContentLoaded', () => {
     ccImageContainer.style.display = 'grid';
     ccNoImage.style.display = 'none';
     resetPreviewTransform();
-    
+
+    // Reset before/after state when switching images
+    if (ccShowBefore) {
+      ccShowBefore = false;
+      if (ccBeforeAfterToggle) {
+        ccBeforeAfterToggle.innerHTML = '<i class="bi bi-eye"></i> Before/After';
+      }
+    }
+
     // Check if we have a correction result for this image
     if (ccCorrectionResults[img.path] && ccCorrectionResults[img.path].base64) {
       ccCorrectedImage.src = ccCorrectionResults[img.path].base64;
@@ -3504,19 +3516,88 @@ window.addEventListener('DOMContentLoaded', () => {
     updateSaveButtonStates();
   }
   
+  function fitScale(containerWidth, containerHeight, imageWidth, imageHeight) {
+    const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+    return {
+      scale,
+      renderedWidth: imageWidth * scale,
+      renderedHeight: imageHeight * scale
+    };
+  }
+
+  function fillScale(containerWidth, containerHeight, imageWidth, imageHeight) {
+    const scale = Math.max(containerWidth / imageWidth, containerHeight / imageHeight);
+    return {
+      scale,
+      renderedWidth: imageWidth * scale,
+      renderedHeight: imageHeight * scale
+    };
+  }
+  
   function applyPreviewTransform() {
-    const transform = `scale(${ccZoomLevel}) rotate(${ccRotationDeg}deg)`;
+    const activeImage = getVisiblePreviewImage();
+    if (!activeImage || !ccPreviewContainer) return;
+    
+    const containerWidth = ccPreviewContainer.clientWidth;
+    const containerHeight = ccPreviewContainer.clientHeight;
+    let imageWidth = activeImage.naturalWidth || activeImage.clientWidth;
+    let imageHeight = activeImage.naturalHeight || activeImage.clientHeight;
+    
+    if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) return;
+    
+    if (Math.abs(ccRotationDeg) % 180 === 90) {
+      [imageWidth, imageHeight] = [imageHeight, imageWidth];
+    }
+    
+    const baseLayout = ccPreviewMode === 'fill'
+      ? fillScale(containerWidth, containerHeight, imageWidth, imageHeight)
+      : fitScale(containerWidth, containerHeight, imageWidth, imageHeight);
+    
+    const renderedWidth = baseLayout.renderedWidth * ccZoomLevel;
+    const renderedHeight = baseLayout.renderedHeight * ccZoomLevel;
+    const offsetX = (containerWidth - renderedWidth) / 2;
+    const offsetY = (containerHeight - renderedHeight) / 2;
+    
     [ccOriginalImage, ccCorrectedImage].forEach((img) => {
       if (!img) return;
+      img.style.width = `${renderedWidth}px`;
+      img.style.height = `${renderedHeight}px`;
       img.style.transformOrigin = 'center center';
-      img.style.transform = transform;
+      img.style.transform = `translate(${offsetX}px, ${offsetY}px) rotate(${ccRotationDeg}deg)`;
     });
   }
   
-  function resetPreviewTransform() {
+  function getVisiblePreviewImage() {
+    const correctedVisible = ccCorrectedImage && ccCorrectedImage.style.display !== 'none' && ccCorrectedImage.src;
+    return correctedVisible ? ccCorrectedImage : ccOriginalImage;
+  }
+  
+  function fitPreviewToView(resetRotation = false, mode = 'fit') {
+    if (resetRotation) {
+      ccRotationDeg = 0;
+    }
+    ccPreviewMode = mode;
     ccZoomLevel = 1.0;
-    ccRotationDeg = 0;
-    applyPreviewTransform();
+    setPreviewModeButtons();
+    
+    const applyLayout = () => {
+      applyPreviewTransform();
+    };
+    
+    const activeImage = getVisiblePreviewImage();
+    if (activeImage && !activeImage.complete) {
+      activeImage.addEventListener('load', applyLayout, { once: true });
+    }
+    
+    applyLayout();
+  }
+  
+  function setPreviewModeButtons() {
+    if (ccToolFit) ccToolFit.classList.toggle('active', ccPreviewMode === 'fit');
+  }
+  
+  function resetPreviewTransform() {
+    fitPreviewToView(true);
   }
   
   function updatePreviewZoom(nextZoom) {
@@ -3565,11 +3646,14 @@ window.addEventListener('DOMContentLoaded', () => {
    */
   function switchToPreviewView() {
     if (ccGridView) ccGridView.style.display = 'none';
-    if (ccPreviewView) ccPreviewView.style.display = 'grid';
-    
+    if (ccPreviewView) ccPreviewView.style.display = 'flex';
+
     // Update toolbar buttons
     if (ccToolGridView) ccToolGridView.classList.remove('active');
     if (ccToolPreviewView) ccToolPreviewView.classList.add('active');
+
+    // Re-apply transform now that container has measured dimensions
+    requestAnimationFrame(() => applyPreviewTransform());
   }
   
   /**
@@ -3629,20 +3713,20 @@ window.addEventListener('DOMContentLoaded', () => {
    */
   function openImageInPreview(index) {
     if (index < 0 || index >= ccSessionImages.length) return;
-    
+
     const img = ccSessionImages[index];
     ccCurrentImageIndex = index;
-    
+
     // Update preview image name
     if (ccPreviewImageName) {
       ccPreviewImageName.textContent = img.name || `Image ${index + 1}`;
     }
-    
-    // Load the image
-    loadImageAtIndex(index);
-    
-    // Switch to preview view
+
+    // Switch to preview view first (container needs visible dimensions)
     switchToPreviewView();
+
+    // Load the image into preview
+    loadImageAtIndex(index);
   }
   
   // Toolbar view toggle button handlers
@@ -3677,7 +3761,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   if (ccToolFit) {
     ccToolFit.addEventListener('click', () => {
-      resetPreviewTransform();
+      fitPreviewToView(false, 'fit');
     });
   }
   
@@ -3713,6 +3797,22 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
   
+  window.addEventListener('resize', () => {
+    if (ccPreviewView && ccPreviewView.style.display !== 'none') {
+      applyPreviewTransform();
+    }
+  });
+
+  // Wheel/scroll zoom on the preview container
+  if (ccPreviewContainer) {
+    ccPreviewContainer.addEventListener('wheel', (e) => {
+      if (!ccPreviewView || ccPreviewView.style.display === 'none') return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? CC_ZOOM_STEP : -CC_ZOOM_STEP;
+      updatePreviewZoom(ccZoomLevel + delta);
+    }, { passive: false });
+  }
+
   // Selection control button handlers
   if (selectAllBtn) {
     selectAllBtn.addEventListener('click', selectAllImages);
@@ -4053,50 +4153,6 @@ window.addEventListener('DOMContentLoaded', () => {
           throw err;
         }
       });
-    });
-  }
-  
-  // Navigation button handlers
-  if (ccPrevImageBtn) {
-    ccPrevImageBtn.addEventListener('click', () => {
-      if (ccCurrentImageIndex > 0) {
-        ccCurrentImageIndex--;
-        loadImageAtIndex(ccCurrentImageIndex);
-      }
-    });
-  }
-  
-  if (ccNextImageBtn) {
-    ccNextImageBtn.addEventListener('click', () => {
-      if (ccCurrentImageIndex < ccSessionImages.length - 1) {
-        ccCurrentImageIndex++;
-        loadImageAtIndex(ccCurrentImageIndex);
-      }
-    });
-  }
-  
-  if (ccRemoveFromLabBtn) {
-
-    ccRemoveFromLabBtn.addEventListener('click', () => {
-      if (ccSessionImages.length === 0) return;
-      
-      const confirmRemove = confirm('Remove this image from Color Correction Lab?');
-      if (!confirmRemove) return;
-      
-      ccSessionImages.splice(ccCurrentImageIndex, 1);
-      
-      if (ccSessionImages.length === 0) {
-        clearColorCorrectionLab();
-        showLibraryGrid();
-        showToast('Color Correction Lab cleared', 'info');
-      } else {
-        if (ccCurrentImageIndex >= ccSessionImages.length) {
-          ccCurrentImageIndex = ccSessionImages.length - 1;
-        }
-        loadImageAtIndex(ccCurrentImageIndex);
-        updateNavigationState();
-        updateSaveButtonStates();
-      }
     });
   }
 
