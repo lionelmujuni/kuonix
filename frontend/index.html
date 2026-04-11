@@ -53,6 +53,10 @@
                     <i class="bi bi-question-circle nav-icon"></i>
                     <span class="nav-label">Help</span>
                 </button>
+                <button class="nav-btn" id="agentToggleBtn" data-tooltip="AI Assistant (⌘J)">
+                    <i class="bi bi-stars nav-icon"></i>
+                    <span class="nav-label">AI</span>
+                </button>
             </div>
 
         </nav>
@@ -465,7 +469,60 @@
         </div>
             </div><!-- /.container -->
         </main><!-- /.main-content -->
+
+        <!-- Agentic Window Panel (right side) -->
+        <aside id="agentPanel" class="agent-panel" aria-label="AI Assistant">
+          <!-- Header -->
+          <div class="agent-header">
+            <div class="agent-title">
+              <i class="bi bi-stars"></i>
+              <span>Kuonix AI</span>
+            </div>
+            <div class="agent-header-actions">
+              <button class="agent-icon-btn" id="agentClearBtn" title="Clear conversation">
+                <i class="bi bi-trash3"></i>
+              </button>
+              <button class="agent-icon-btn" id="agentCloseBtn" title="Close panel">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <!-- Resize handle -->
+          <div class="agent-resize-handle" id="agentResizeHandle"></div>
+          <!-- Message history -->
+          <div class="agent-messages" id="agentMessages"></div>
+          <!-- Typing indicator -->
+          <div class="agent-typing" id="agentTyping" style="display:none;">
+            <div class="agent-typing-dots">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <!-- Input area -->
+          <div class="agent-input-area">
+            <div class="agent-context-badge" id="agentContextBadge"></div>
+            <div class="agent-input-row">
+              <textarea id="agentInput" class="agent-input" placeholder="Ask about your images..." rows="1" maxlength="2000"></textarea>
+              <button id="agentSendBtn" class="agent-send-btn" title="Send (Enter)">
+                <i class="bi bi-send-fill"></i>
+              </button>
+            </div>
+          </div>
+        </aside>
     </div><!-- /.app-layout -->
+
+    <!-- Command Bar Modal -->
+    <div id="commandBarOverlay" class="command-bar-overlay" role="dialog" aria-modal="true" aria-label="Command bar" style="display:none;">
+      <div class="command-bar">
+        <div class="command-bar-input-row">
+          <i class="bi bi-stars command-bar-icon"></i>
+          <input id="commandBarInput" class="command-bar-input" placeholder="Ask or run a command..." autocomplete="off" spellcheck="false" />
+          <kbd class="command-bar-esc">Esc</kbd>
+        </div>
+        <div class="command-bar-results" id="commandBarResults"></div>
+      </div>
+    </div>
+
     <script src="renderer.js"></script>
+    <script src="agent.js"></script>
 </body>
 </html>
