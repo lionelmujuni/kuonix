@@ -457,16 +457,16 @@ window.addEventListener('DOMContentLoaded', () => {
     clearAllBtn.style.display = uploadedImages.length > 0 ? 'inline-flex' : 'none';
   }
 
-  // Click to browse folders (Shift+Click for files)
+  // Click to browse image files (Shift+Click for folders)
   fileSelect.addEventListener('click', (e) => {
     if (e.shiftKey) {
-      // Shift pressed: Select files
-      fileElem.removeAttribute('webkitdirectory');
-      fileElem.setAttribute('multiple', '');
-    } else {
-      // Default: Select folders
+      // Shift pressed: Select folders
       fileElem.setAttribute('webkitdirectory', '');
       fileElem.removeAttribute('multiple');
+    } else {
+      // Default: Select files
+      fileElem.removeAttribute('webkitdirectory');
+      fileElem.setAttribute('multiple', '');
     }
     fileElem.click();
   });
@@ -474,13 +474,13 @@ window.addEventListener('DOMContentLoaded', () => {
   // Add more images button
   addMoreBtn.addEventListener('click', (e) => {
     if (e.shiftKey) {
-      // Shift pressed: Select files
-      fileElem.removeAttribute('webkitdirectory');
-      fileElem.setAttribute('multiple', '');
-    } else {
-      // Default: Select folders
+      // Shift pressed: Select folders
       fileElem.setAttribute('webkitdirectory', '');
       fileElem.removeAttribute('multiple');
+    } else {
+      // Default: Select files
+      fileElem.removeAttribute('webkitdirectory');
+      fileElem.setAttribute('multiple', '');
     }
     fileElem.click();
   });
