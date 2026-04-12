@@ -17,10 +17,16 @@ function initAgent() {
   const agentContextBadge = document.getElementById('agentContextBadge');
   const agentToggleBtn = document.getElementById('agentToggleBtn');
   const agentResizeHandle = document.getElementById('agentResizeHandle');
+  const agentInputRow = document.querySelector('.agent-input-row');
 
   const commandBarOverlay = document.getElementById('commandBarOverlay');
   const commandBarInput = document.getElementById('commandBarInput');
   const commandBarResults = document.getElementById('commandBarResults');
+
+  const agentSuggestions = document.createElement('div');
+  agentSuggestions.className = 'agent-suggestions';
+  agentSuggestions.id = 'agentSuggestions';
+  agentInputRow?.insertAdjacentElement('afterend', agentSuggestions);
 
   // ===== STATE =====
   let agentOpen = false;
@@ -30,10 +36,37 @@ function initAgent() {
   let agentPanelWidth = 340;
   let isResizing = false;
   let selectedActionIndex = -1;
+  let selectedSuggestionIndex = -1;
+  let visibleSuggestions = [];
   const AGENT_ENDPOINT = 'http://localhost:8081/agent/chat';
+  const DEFAULT_COMMANDS = [
+    'auto analyze',
+    'open contrast decrease',
+    'open color lab',
+    'go to library',
+    'go to upload',
+    'open settings',
+    'zoom in',
+    'zoom out',
+    'fit to view',
+    'compare before after'
+  ];
 
   // ===== QUICK ACTIONS LIST =====
   const quickActions = [
+    {
+      id: 'auto-analyze',
+      label: 'Auto Analyze',
+      icon: 'bi-magic',
+      description: 'Run issue detection on uploaded images',
+      action: async () => {
+        if (window.kuonixAgent?.autoAnalyze) {
+          const result = await window.kuonixAgent.autoAnalyze();
+          notify(result.message, result.ok ? 'success' : 'warning');
+        }
+        closeCommandBar();
+      }
+    },
     {
       id: 'open-color-lab',
       label: 'Open Color Lab',
@@ -255,11 +288,206 @@ function initAgent() {
     }
     console.log(`[agent:${type}] ${message}`);
   }
+
+  function normalizeCommandText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, ' ')
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getAgentRuntimeState() {
+    if (window.kuonixAgent?.getState) {
+      return window.kuonixAgent.getState();
+    }
+    return { availableIssues: [] };
+  }
+
+  function formatIssueLabel(issue) {
+    return String(issue || '')
+      .replace(/_/g, ' ')
+      .replace(/Needs /g, '')
+      .replace(/Oversaturated/g, 'Oversat')
+      .replace(/ColorCast/g, 'Cast')
+      .replace(/SkinTone/g, 'Skin');
+  }
+
+  function buildSuggestionList(query = '') {
+    const state = getAgentRuntimeState();
+    const issueCommands = (state.availableIssues || []).map(issue => `open ${formatIssueLabel(issue)}`);
+    const suggestions = Array.from(new Set([...DEFAULT_COMMANDS, ...issueCommands]));
+    const normalizedQuery = normalizeCommandText(query);
+
+    if (!normalizedQuery) {
+      return suggestions.slice(0, 6);
+    }
+
+    const ranked = suggestions
+      .map(command => {
+        const normalized = normalizeCommandText(command);
+        let score = 0;
+
+        if (normalized === normalizedQuery) {
+          score = 100;
+        } else if (normalized.startsWith(normalizedQuery)) {
+          score = 80;
+        } else if (normalized.includes(normalizedQuery)) {
+          score = 60;
+        } else if (normalizedQuery.split(' ').every(token => normalized.includes(token))) {
+          score = 40;
+        }
+
+        return { command, score };
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.command.localeCompare(b.command))
+      .map(item => item.command);
+
+    return ranked.slice(0, 6);
+  }
+
+  function hideAgentSuggestions() {
+    visibleSuggestions = [];
+    selectedSuggestionIndex = -1;
+    agentSuggestions.innerHTML = '';
+    agentSuggestions.classList.remove('agent-suggestions--visible');
+  }
+
+  function selectSuggestion(index) {
+    const buttons = agentSuggestions.querySelectorAll('.agent-suggestion');
+    buttons.forEach((button, buttonIndex) => {
+      button.classList.toggle('selected', buttonIndex === index);
+    });
+    selectedSuggestionIndex = index;
+  }
+
+  function renderAgentSuggestions(query = '') {
+    const suggestions = buildSuggestionList(query);
+    visibleSuggestions = suggestions;
+    selectedSuggestionIndex = -1;
+
+    if (suggestions.length === 0) {
+      hideAgentSuggestions();
+      return;
+    }
+
+    agentSuggestions.innerHTML = '';
+    suggestions.forEach((suggestion, index) => {
+      const suggestionBtn = document.createElement('button');
+      suggestionBtn.type = 'button';
+      suggestionBtn.className = 'agent-suggestion';
+      suggestionBtn.textContent = suggestion;
+      suggestionBtn.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        agentInput.value = suggestion;
+        sendAgentMessage(suggestion);
+      });
+      suggestionBtn.addEventListener('mouseenter', () => selectSuggestion(index));
+      agentSuggestions.appendChild(suggestionBtn);
+    });
+
+    agentSuggestions.classList.add('agent-suggestions--visible');
+  }
+
+  function acceptSuggestion() {
+    const suggestion = visibleSuggestions[selectedSuggestionIndex] || visibleSuggestions[0];
+    if (!suggestion) return false;
+
+    agentInput.value = suggestion;
+    agentInput.style.height = 'auto';
+    agentInput.style.height = Math.min(agentInput.scrollHeight, 120) + 'px';
+    renderAgentSuggestions(suggestion);
+    return true;
+  }
+
+  function resolveHardcodedIntent(userMessage) {
+    const normalized = normalizeCommandText(userMessage);
+    if (!normalized) return null;
+
+    const exactMap = [
+      {
+        matches: ['auto analyze', 'analyze', 'analyze now', 'run analysis', 'analyze uploads'],
+        intent: { type: 'autoAnalyze' }
+      },
+      {
+        matches: ['open color lab', 'go to color lab', 'color lab'],
+        intent: { type: 'openColorLab' }
+      },
+      {
+        matches: ['go to library', 'open library', 'library'],
+        intent: { type: 'goToLibrary' }
+      },
+      {
+        matches: ['go to upload', 'open upload', 'upload', 'upload and analyze'],
+        intent: { type: 'goToUpload' }
+      },
+      {
+        matches: ['open settings', 'go to settings', 'settings'],
+        intent: { type: 'openSettings' }
+      }
+    ];
+
+    const exact = exactMap.find(entry => entry.matches.includes(normalized));
+    if (exact) {
+      return exact.intent;
+    }
+
+    const openIssueMatch = normalized.match(/^(?:open|show|load)\s+(.+)$/);
+    if (openIssueMatch) {
+      const issueQuery = openIssueMatch[1]
+        .replace(/\b(?:in|inside)\s+color\s+lab\b/g, '')
+        .replace(/\b(?:issue|issues|images|photos)\b/g, '')
+        .trim();
+
+      if (issueQuery && !['color lab', 'library', 'upload', 'settings'].includes(issueQuery)) {
+        return { type: 'openIssueInColorLab', issueQuery };
+      }
+    }
+
+    const filterMatch = normalized.match(/^(?:filter|show)\s+(.+?)\s+(?:images|photos)$/);
+    if (filterMatch) {
+      return { type: 'applyIssueFilter', issueQuery: filterMatch[1].trim() };
+    }
+
+    return null;
+  }
+
+  async function executeHardcodedIntent(intent) {
+    if (!intent) return null;
+
+    try {
+      switch (intent.type) {
+        case 'autoAnalyze':
+          return await window.kuonixAgent?.autoAnalyze?.();
+        case 'openIssueInColorLab':
+          return await window.kuonixAgent?.openIssueInColorLab?.(intent.issueQuery);
+        case 'applyIssueFilter':
+          return await window.kuonixAgent?.applyIssueFilter?.(intent.issueQuery);
+        case 'openColorLab':
+          return window.kuonixAgent?.openColorLab?.();
+        case 'goToLibrary':
+          return window.kuonixAgent?.goToLibrary?.();
+        case 'goToUpload':
+          return window.kuonixAgent?.goToUpload?.();
+        case 'openSettings':
+          return window.kuonixAgent?.openSettings?.();
+        default:
+          return null;
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        message: error.message || 'Command failed.'
+      };
+    }
+  }
   
   function localAgentFallback(userMessage, context) {
     const msg = (userMessage || '').toLowerCase();
     const actions = [];
-    let response = 'I can help with navigation, Color Lab tools, and workflow steps. Try asking: "open color lab", "zoom in", or "go to library".';
+    let response = 'Use direct commands here. Try `auto analyze`, `open contrast decrease`, or `open color lab`.';
     
     if (msg.includes('color lab')) {
       response = 'Opening Color Lab helps you run method-based corrections and compare before/after. I can open it from the command bar with Cmd+J.';
@@ -299,11 +527,20 @@ function initAgent() {
     agentInput.value = '';
     agentInput.style.height = 'auto';
     agentSendBtn.disabled = true;
+    hideAgentSuggestions();
 
     showTypingIndicator();
 
     try {
       const context = getAgentContext();
+      const hardcodedIntent = resolveHardcodedIntent(userMessage);
+      if (hardcodedIntent) {
+        const result = await executeHardcodedIntent(hardcodedIntent);
+        hideTypingIndicator();
+        addMessage(result?.message || 'Command finished.', 'agent');
+        return;
+      }
+
       let data;
       
       try {
@@ -359,10 +596,11 @@ function initAgent() {
     agentInput.focus();
 
     if (agentConversation.length === 0) {
-      addMessage('Hi! I\'m your Kuonix AI assistant. I can help you navigate the app, adjust image settings, and answer questions about your workflow. What can I do for you?', 'agent');
+      addMessage('Use direct commands here. Try `auto analyze`, `open contrast decrease`, or `open color lab`.', 'agent');
     }
 
     updateContextBadge();
+    renderAgentSuggestions(agentInput.value);
   }
 
   function closeAgentPanel() {
@@ -407,6 +645,17 @@ function initAgent() {
   agentInput.addEventListener('input', () => {
     agentInput.style.height = 'auto';
     agentInput.style.height = Math.min(agentInput.scrollHeight, 120) + 'px';
+    renderAgentSuggestions(agentInput.value);
+  });
+
+  agentInput.addEventListener('focus', () => {
+    renderAgentSuggestions(agentInput.value);
+  });
+
+  agentInput.addEventListener('blur', () => {
+    setTimeout(() => {
+      hideAgentSuggestions();
+    }, 120);
   });
 
   // ===== MESSAGE SENDING =====
@@ -417,6 +666,26 @@ function initAgent() {
   });
 
   agentInput.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' && visibleSuggestions.length > 0) {
+      e.preventDefault();
+      const nextIndex = Math.min(selectedSuggestionIndex + 1, visibleSuggestions.length - 1);
+      selectSuggestion(nextIndex);
+      return;
+    }
+
+    if (e.key === 'ArrowUp' && visibleSuggestions.length > 0) {
+      e.preventDefault();
+      const nextIndex = Math.max(selectedSuggestionIndex - 1, 0);
+      selectSuggestion(nextIndex);
+      return;
+    }
+
+    if (e.key === 'Tab' && visibleSuggestions.length > 0) {
+      e.preventDefault();
+      acceptSuggestion();
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!agentTyping_flag) {

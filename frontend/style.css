@@ -3187,6 +3187,17 @@ details[open] .cc-theory-header i.cc-chevron {
   align-items: flex-end;
 }
 
+.agent-suggestions {
+  display: none;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-10);
+}
+
+.agent-suggestions.agent-suggestions--visible {
+  display: flex;
+}
+
 .agent-input {
   flex: 1;
   padding: var(--space-8) var(--space-10);
@@ -3237,6 +3248,26 @@ details[open] .cc-theory-header i.cc-chevron {
 .agent-send-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.agent-suggestion {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--color-text);
+  border-radius: var(--radius-full);
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.agent-suggestion:hover,
+.agent-suggestion.selected {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 /* ===== COMMAND BAR ===== */

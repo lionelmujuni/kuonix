@@ -1664,6 +1664,74 @@ window.addEventListener('DOMContentLoaded', () => {
       .replace(/SkinTone/g, 'Skin');
   }
 
+  function normalizeIssueText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\bneeds\b/g, ' ')
+      .replace(/\bissue\b/g, ' ')
+      .replace(/\bimages?\b/g, ' ')
+      .replace(/\bphotos?\b/g, ' ')
+      .replace(/\bto\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function getAvailableIssueTypes() {
+    const issueSet = new Set();
+
+    [...uploadedImages, ...libraryImages].forEach(img => {
+      if (Array.isArray(img.issues)) {
+        img.issues.forEach(issue => issueSet.add(issue));
+      }
+    });
+
+    return Array.from(issueSet).sort((a, b) => a.localeCompare(b));
+  }
+
+  function findIssueType(query) {
+    const normalizedQuery = normalizeIssueText(query);
+    if (!normalizedQuery) return null;
+
+    const compactQuery = normalizedQuery.replace(/\s+/g, '');
+    const candidates = getAvailableIssueTypes();
+    let bestMatch = null;
+    let bestScore = -1;
+
+    candidates.forEach(issue => {
+      const normalizedIssue = normalizeIssueText(issue);
+      const normalizedLabel = normalizeIssueText(formatIssueName(issue));
+      const aliases = [
+        normalizedIssue,
+        normalizedLabel,
+        normalizedIssue.replace(/\s+/g, ''),
+        normalizedLabel.replace(/\s+/g, '')
+      ];
+
+      let score = -1;
+      if (aliases.includes(normalizedQuery) || aliases.includes(compactQuery)) {
+        score = 100;
+      } else if (aliases.some(alias => alias.startsWith(normalizedQuery) || alias.startsWith(compactQuery))) {
+        score = 80;
+      } else if (
+        aliases.some(alias =>
+          alias.includes(normalizedQuery) ||
+          alias.includes(compactQuery) ||
+          normalizedQuery.includes(alias)
+        )
+      ) {
+        score = 60;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = issue;
+      }
+    });
+
+    return bestScore >= 0 ? bestMatch : null;
+  }
+
   /**
    * Show export buttons after successful analysis
    */
@@ -3871,6 +3939,164 @@ window.addEventListener('DOMContentLoaded', () => {
       showToast(`${selectedImages.length} image${selectedImages.length !== 1 ? 's' : ''} added to Color Correction Lab`, 'success');
     });
   }
+
+  window.showToast = showToast;
+  window.kuonixAgent = {
+    getState() {
+      return {
+        uploadedCount: uploadedImages.length,
+        libraryCount: libraryImages.length,
+        selectedLibraryCount: selectedLibraryImages.length,
+        currentFilter,
+        availableIssues: getAvailableIssueTypes()
+      };
+    },
+
+    async autoAnalyze() {
+      if (uploadedImages.length === 0) {
+        return {
+          ok: false,
+          message: 'Upload images first, then run `auto analyze`.'
+        };
+      }
+
+      if (analyzeBtn.disabled) {
+        return {
+          ok: false,
+          message: 'Analysis is already running.'
+        };
+      }
+
+      if (uploadBtn) {
+        uploadBtn.click();
+      }
+
+      analyzeBtn.click();
+
+      return {
+        ok: true,
+        message: `Started analysis for ${uploadedImages.length} image${uploadedImages.length !== 1 ? 's' : ''}.`
+      };
+    },
+
+    async openIssueInColorLab(issueQuery) {
+      const issueType = findIssueType(issueQuery);
+
+      if (!issueType) {
+        const available = getAvailableIssueTypes().map(formatIssueName);
+        const hint = available.length > 0
+          ? `Available issues: ${available.slice(0, 6).join(', ')}${available.length > 6 ? '...' : ''}`
+          : 'Analyze images first so issue-specific commands have something to open.';
+
+        return {
+          ok: false,
+          message: `I couldn't match "${issueQuery}" to a detected issue. ${hint}`
+        };
+      }
+
+      if (libraryBtn) {
+        libraryBtn.click();
+      }
+
+      await displayLibraryGrid(true);
+      selectByIssue(issueType);
+
+      const selectedImages = libraryImages.filter(img => selectedLibraryImages.includes(img.id));
+      if (selectedImages.length === 0) {
+        return {
+          ok: false,
+          message: `No images currently match ${formatIssueName(issueType)}.`
+        };
+      }
+
+      if (addToCorrectionBtn && !addToCorrectionBtn.disabled) {
+        addToCorrectionBtn.click();
+      }
+
+      updateNavActiveState(colorLabBtn);
+
+      return {
+        ok: true,
+        issueType,
+        count: selectedImages.length,
+        message: `Opened ${selectedImages.length} image${selectedImages.length !== 1 ? 's' : ''} with ${formatIssueName(issueType)} in Color Lab.`
+      };
+    },
+
+    async applyIssueFilter(issueQuery) {
+      const issueType = findIssueType(issueQuery);
+      if (!issueType) {
+        return {
+          ok: false,
+          message: `I couldn't match "${issueQuery}" to an issue filter.`
+        };
+      }
+
+      const filterButton = document.querySelector(`#issueFilters .filter-btn[data-filter="${issueType}"]`);
+      if (!filterButton) {
+        return {
+          ok: false,
+          message: 'Run `auto analyze` first so the issue filters are available.'
+        };
+      }
+
+      if (uploadBtn) {
+        uploadBtn.click();
+      }
+
+      filterButton.click();
+
+      return {
+        ok: true,
+        issueType,
+        message: `Filtered Upload & Analyze to ${formatIssueName(issueType)}.`
+      };
+    },
+
+    openColorLab() {
+      if (colorLabBtn) {
+        colorLabBtn.click();
+      }
+
+      return {
+        ok: true,
+        message: 'Opened Color Lab.'
+      };
+    },
+
+    goToLibrary() {
+      if (libraryBtn) {
+        libraryBtn.click();
+      }
+
+      return {
+        ok: true,
+        message: 'Opened Library.'
+      };
+    },
+
+    goToUpload() {
+      if (uploadBtn) {
+        uploadBtn.click();
+      }
+
+      return {
+        ok: true,
+        message: 'Opened Upload & Analyze.'
+      };
+    },
+
+    openSettings() {
+      if (settingsBtn) {
+        settingsBtn.click();
+      }
+
+      return {
+        ok: true,
+        message: 'Opened Settings.'
+      };
+    }
+  };
   
   // Navigation button handlers
   if (ccPrevImageBtn) {
