@@ -1,0 +1,9 @@
+
+node_modules/
+*.xml
+.git/
+.git
+restful/build/
+restful/.gradle/
+restful/HELP.md
+restful/bin

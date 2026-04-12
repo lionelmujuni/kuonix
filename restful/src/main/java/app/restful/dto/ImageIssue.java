@@ -1,0 +1,27 @@
+package app.restful.dto;
+
+public enum ImageIssue {
+    Needs_Exposure_Increase,
+    Needs_Exposure_Decrease,
+    Needs_Contrast_Increase,
+    Needs_Contrast_Decrease,
+    Needs_Saturation_Increase,
+    Oversaturated_Global,
+    Oversaturated_Red,
+    Oversaturated_Green,
+    Oversaturated_Blue,
+    Oversaturated_Cyan,
+    Oversaturated_Magenta,
+    Oversaturated_Yellow,
+    ColorCast_Red,
+    ColorCast_Green,
+    ColorCast_Blue,
+    ColorCast_Cyan,
+    ColorCast_Magenta,
+    ColorCast_Yellow,
+    Needs_Noise_Reduction,
+    SkinTone_Too_Green,
+    SkinTone_Too_Magenta,
+    SkinTone_Too_Desaturated,
+    SkinTone_Too_OrangeRed
+}

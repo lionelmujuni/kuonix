@@ -1,0 +1,44 @@
+# Build artifacts and caches
+restful/build/
+restful/.gradle/
+restful/bin/
+
+# Dependencies
+frontend/node_modules/
+
+# Platform binaries (dcraw executables — never edited)
+frontend/bin/darwin/
+frontend/bin/linux/
+frontend/bin/win32/
+
+# Compiled backend JAR embedded in frontend
+frontend/kuonix.jar
+
+# Binary assets
+frontend/assets/icons/
+htdocs/assets/icons/
+htdocs/assets/images/
+
+# Generated and temporary files
+*.log
+logs/
+.cache/
+coverage/
+
+# Secrets and environment files
+.env
+.env.*
+*.pem
+*.key
+credentials/
+
+# Git internals and IDE config
+.git/
+.vscode/
+
+# Large files not relevant to coding
+Doxyfile
+Frontend feature documentation and expectations.pdf
+
+# CI config (only needed when editing pipelines)
+bitbucket-pipelines.yml

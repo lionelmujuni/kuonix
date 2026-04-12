@@ -1,0 +1,48 @@
+server:
+  port: 8081
+
+# ---------------------------------------------------------------------------
+# LangChain4j AI assistant (configured via Settings UI)
+# Users can enable/disable and configure Ollama via the web interface at:
+# http://localhost:8081/settings.html
+# Settings are stored in: ~/.kuonix/ollama-settings.json
+# ---------------------------------------------------------------------------
+langchain4j:
+  chat-memory:
+    max-messages: 10  # Per-session sliding window memory
+
+# RAW image processing configuration
+raw:
+  dcraw:
+    path: ${DCRAW_PATH:dcraw_emu}  # Path to dcraw_emu binary (from env or default)
+  cache:
+    enabled: true
+    directory: ${DCRAW_CACHE_DIR:}  # Cache directory (from env or default ~/.image-batch-correction/dcraw-cache)
+    maxSizeMb: 5000                  # Maximum cache size in megabytes
+    maxAgeDays: 30                  # Clean entries older than this many days
+  matrices:
+    mode: hybrid                    # Matrix lookup: hardcoded -> disk -> generic
+    
+classifier:
+  thresholds:
+    underexpMedianMax: 0.30
+    underexpBlackTailMinPct: 0.07
+    overexpMedianMin: 0.70
+    overexpWhiteTailMinPct: 0.05
+    blackClipLevel: 0.03
+    whiteClipLevel: 0.97
+    lowContrastMinSpan: 0.45
+    highContrastTailPct: 0.10
+    dullMeanSMax: 0.12
+    dullP95SMax: 0.25
+    overSatGlobalP95Min: 0.85
+    overSatChannelP95Min: 0.90
+    castABDistMin: 6.0
+    noiseShadowMinRatio: 0.06
+    shadowMaskThreshold: 0.35
+    skinDetectMinPixels: 500
+    skinSatMin: 0.18
+    skinSatMax: 0.68
+    skinLineDeg: 25.0
+    skinLineTolDeg: 12.0
+    skinOverSatMin: 0.70

@@ -1,0 +1,26 @@
+# Template maven-build with Doxygen
+
+image: gradle:8.14.3-jdk24
+
+pipelines:
+  default:
+    - parallel:
+      - step:
+          name: Gradle Build & Test
+          caches:
+            - gradle
+          script:
+            - gradle --version
+            - java -version
+            - cd restful
+            - bash ./gradlew test
+      - step:
+          name: Generate Doxygen Docs
+          image: debian:bullseye-slim   # lightweight base for Doxygen
+          script:
+            # Install Doxygen and Graphviz
+            - apt-get update && apt-get install -y doxygen graphviz
+            # Run Doxygen (assumes Doxyfile exists in repo root)
+            - doxygen Doxyfile
+          artifacts:
+            - docs/html/**   # adjust to match OUTPUT_DIRECTORY in your Doxyfile

@@ -1,0 +1,30 @@
+server:
+  port: 8081
+
+# Disable LangChain4j AI service in tests
+langchain4j:
+  enabled: false
+
+classifier:
+  thresholds:
+    underexpMedianMax: 0.30
+    underexpBlackTailMinPct: 0.07
+    overexpMedianMin: 0.70
+    overexpWhiteTailMinPct: 0.05
+    blackClipLevel: 0.03
+    whiteClipLevel: 0.97
+    lowContrastMinSpan: 0.45
+    highContrastTailPct: 0.10
+    dullMeanSMax: 0.12
+    dullP95SMax: 0.25
+    overSatGlobalP95Min: 0.85
+    overSatChannelP95Min: 0.90
+    castABDistMin: 6.0
+    noiseShadowMinRatio: 0.06
+    shadowMaskThreshold: 0.35
+    skinDetectMinPixels: 500
+    skinSatMin: 0.18
+    skinSatMax: 0.68
+    skinLineDeg: 25.0
+    skinLineTolDeg: 12.0
+    skinOverSatMin: 0.70

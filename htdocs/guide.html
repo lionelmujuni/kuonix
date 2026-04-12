@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="KUONIX User Guide - Complete documentation for mastering your image processing workflow with KUONIX's features and functionality.">
+    <meta name="keywords" content="kuonix guide, photo editing help, batch processing tutorial, image correction documentation">
+    <meta name="author" content="KUONIX">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yourdomain.com/guide.html">
+    <meta property="og:title" content="KUONIX User Guide | Complete Documentation">
+    <meta property="og:description" content="Master your image processing workflow with this comprehensive guide to KUONIX's features and functionality.">
+    <meta property="og:image" content="https://yourdomain.com/assets/images/hero/aurora.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/icons/favicon-16x16.png">
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+    
+    <title>KUONIX | User Guide</title>
+    
+    <!-- Preload Critical Resources -->
+    <link rel="preload" href="assets/css/main.css" as="style">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="assets/css/main.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/layouts.css">
+    
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" 
+            integrity="sha512-7eHRwcbYkK4d9g/6tD/mhkf++eoTHwpNM9woBxtPUBWm67zeAfFC+HrdoE2GanKeocly/VxeLvIqwvCdk7qScg==" 
+            crossorigin="anonymous" 
+            defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" 
+            integrity="sha512-onMTRKJBKz8M1TnqqDuGBlowlH0ohFzMXYRNebz+yOcc5TQr/zAKsthzhuv0hiyUKEiQEQXEynnXCvNTOk50dg==" 
+            crossorigin="anonymous" 
+            defer></script>
+    <script src="https://unpkg.com/@studio-freight/lenis@1.0.42/dist/lenis.min.js" defer></script>
+    
+    <!-- Local Scripts -->
+    <script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+
+    <!-- Skip to main content (accessibility) -->
+    <a href="#main-content" class="skip-to-content">Skip to main content</a>
+
+    <nav aria-label="Main navigation" role="navigation">
+        <h1 class="logo" aria-label="KUONIX Home">
+            <a href="index.html">KUONIX.</a>
+        </h1>
+        <ul class="nav-links" role="list">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="guide.html" class="nav-link current-page" aria-current="page">User Guide</a></li>
+            <li><a href="index.html#download" class="nav-link">Download</a></li>
+        </ul>
+    </nav>
+
+    <main id="main-content">
+
+    <section class="guide-hero">
+        <h1>Kuonix User Guide</h1>
+        <p>Master your image processing workflow with this comprehensive guide to Kuonix's features and functionality.</p>
+    </section>
+
+    <div class="guide-container">
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="guide-sidebar">
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Navigation</h3>
+                <ul class="sidebar-links">
+                    <li><a href="#nav-workflow" class="active">🧭 Navigation & Workflow</a></li>
+                    <li><a href="#page-breakdown">🖼️ Page-by-Page Breakdown</a></li>
+                </ul>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Page Sections</h3>
+                <ul class="sidebar-links">
+                    <li><a href="#upload-analyze">A. Upload & Analyze</a></li>
+                    <li><a href="#library">B. Library Page</a></li>
+                    <li><a href="#color-lab">C. Color Lab (PRO)</a></li>
+                    <li><a href="#settings">D. Settings Page</a></li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="guide-content">
+            <!-- NAVIGATION & WORKFLOW SECTION -->
+            <section id="nav-workflow" class="content-section">
+                <div class="section-icon">🧭</div>
+                <h2 class="section-title">Navigation & Workflow</h2>
+                <p>The app is organized into a sidebar on the left, which contains two main sections:</p>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h4>1. Workflow</h4>
+                        <ul>
+                            <li><strong>Upload & Analyze</strong>: The landing page where you import and run initial diagnostics.</li>
+                            <li><strong>Library</strong>: Storage area for uploaded images with management and filtering.</li>
+                            <li><strong>Color Lab (PRO)</strong>: Advanced feature for detailed color correction and algorithm-based adjustments.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h4>2. Actions</h4>
+                        <ul>
+                            <li><strong>Export</strong>: Tools for saving and moving processed files.</li>
+                            <li><strong>Settings</strong>: Customization options for appearance and external app integration.</li>
+                            <li><strong>Help</strong>: Resources for troubleshooting and learning.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PAGE BREAKDOWN SECTION -->
+            <section id="page-breakdown" class="content-section">
+                <div class="section-icon">🖼️</div>
+                <h2 class="section-title">Page-by-Page Breakdown</h2>
+                
+                <!-- UPLOAD & ANALYZE -->
+                <div id="upload-analyze" class="subsection">
+                    <h3 class="subsection-title">A. Upload & Analyze Page</h3>
+                    <p>This is the starting point for any project.</p>
+                    
+                    <div class="workflow-diagram">
+                        <div class="workflow-step">
+                            <div class="step-number">1</div>
+                            <h4>Importing</h4>
+                            <p>Drag & drop or browse to upload files from your system.</p>
+                        </div>
+                        <div class="workflow-step">
+                            <div class="step-number">2</div>
+                            <h4>Auto-Analysis</h4>
+                            <p>Click "Auto-Analyze" to scan for common issues.</p>
+                        </div>
+                        <div class="workflow-step">
+                            <div class="step-number">3</div>
+                            <h4>Batch Action</h4>
+                            <p>Use "Organize & Export" to sort images automatically.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="tip-box">
+                        <strong>Common Issues Detected:</strong>
+                        <ul>
+                            <li>Cast Yellow/Blue (Color balance)</li>
+                            <li>Contrast Decrease/Increase</li>
+                            <li>Exposure Increase</li>
+                            <li>Noise Reduction</li>
+                            <li>Saturation Increase</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="ui-mock">
+                        Drop photos or click to browse
+                    </div>
+                </div>
+
+                <!-- LIBRARY PAGE -->
+                <div id="library" class="subsection">
+                    <h3 class="subsection-title">B. Library Page</h3>
+                    <p>This page acts as a file manager for your project.</p>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>Grid View</h4>
+                            <p>Displays thumbnails of all uploaded images with visual preview.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Selection Tools</h4>
+                            <p>Includes "Select All" checkbox for bulk operations and batch processing.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Quick Actions</h4>
+                            <p>Each thumbnail has Delete button and issue tags for immediate action.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Integration</h4>
+                            <p>Select images and click "Add to Color Lab" to move them into advanced editing.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COLOR LAB -->
+                <div id="color-lab" class="subsection">
+                    <h3 class="subsection-title">C. Color Lab (PRO)</h3>
+                    <p>The core editing suite where manual and algorithmic corrections happen. Color Lab implements 7 research-based color correction algorithms for professional photography workflows.</p>
+                    
+                    <!-- Screenshot Placeholder -->
+                    <div style="background: var(--pearl-bg); border-radius: var(--radius-lg); padding: 2rem; margin: 2rem 0; border: 2px dashed var(--accent-cyan);">
+                        <p style="text-align: center; color: var(--text-muted); margin-bottom: 1rem;">Screenshot: Color Lab Interface</p>
+                        <div style="aspect-ratio: 16/9; background: #ddd; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: #999;">
+                            <!-- User will provide: colorlab-interface.png showing split-view before/after preview with algorithm dropdown and parameter sliders -->
+                            <img src="assets/images/screenshots/colorlab-interface.png" alt="Color Lab split-view interface with before/after preview, algorithm selection dropdown, and adjustment sliders" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
+                        <p style="text-align: center; color: var(--text-muted); margin-top: 1rem; font-size: 0.9rem;">Split-view preview with algorithm selection and parameter controls</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h4>Picture Preview</h4>
+                        <p>Large central viewing area with "Before/After" split-view toggle to compare original and corrected images in real-time.</p>
+                    </div>
+
+                    <!-- 7 Color Correction Algorithms -->
+                    <div class="feature-card" style="background: linear-gradient(135deg, var(--card-bg) 0%, var(--pearl-bg) 100%); border: 2px solid var(--accent-cyan);">
+                        <h4 style="color: var(--accent-cyan); margin-bottom: 1.5rem;">7 Color Correction Algorithms</h4>
+                        <p style="margin-bottom: 2rem;">Choose the right algorithm for your specific correction needs:</p>
+                        
+                        <div style="display: grid; gap: 1.5rem;">
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">1. Gray World</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Assumes the average color of the scene should be neutral gray.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> General white balance correction for mixed lighting scenes.</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">2. White Patch (Max RGB)</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Assumes the brightest patch in the image should be pure white.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Images with clear white reference points (white walls, paper, clothing).</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">3. Shades of Gray</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Advanced Minkowski p-norm method for sophisticated white balance.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Professional work requiring precise color accuracy (product photography, art reproduction).</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">4. Exposure Adjustment</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Applies uniform gain across all color channels to fix under/overexposure.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Globally dark or bright images that need overall brightness correction.</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">5. Saturation Enhancement</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">HSV-based saturation control to boost or reduce color intensity.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Dull, flat images that need color vibrancy, or oversaturated images needing toning down.</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid var(--accent-cyan);">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem;">6. Color Matrix Transform</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">3×3 linear transformation for color space conversion and creative color grading.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Advanced color grading, film emulation, or specific color space conversions.</p>
+                            </div>
+
+                            <div style="background: var(--card-bg); padding: 1.5rem; border-radius: var(--radius-md); border-left: 4px solid #FF6B35;">
+                                <h5 style="font-size: 1.1rem; margin-bottom: 0.5rem; color: #FF6B35;">⭐ 7. Color Distribution Alignment</h5>
+                                <p style="color: var(--text-muted); margin-bottom: 0.5rem;">Matches the color distribution of target images to a reference image using LAB color space analysis.</p>
+                                <p style="font-size: 0.9rem; color: var(--text-muted);"><strong>When to use:</strong> Multi-camera shoots (weddings, events), batch consistency, style transfer. See tutorial below.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h4>Controls Panel</h4>
+                        <ul>
+                            <li><strong>Algorithm Selection</strong>: Dropdown menu to choose from the 7 correction methods above.</li>
+                            <li><strong>Dynamic Adjustments</strong>: Parameter sliders appear based on selected algorithm (Correction Strength, Exposure Gain, Saturation Level, etc.).</li>
+                            <li><strong>Theory & Research</strong>: Each algorithm includes "Problem Solved" and "Algorithm Explanation" sections for understanding the correction approach.</li>
+                            <li><strong>Presets</strong>: Name and save current algorithm + parameter combinations for instant reuse.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <h4>Execution Options</h4>
+                        <ul>
+                            <li><strong>Save This Image</strong>: Apply correction to the current image only</li>
+                            <li><strong>Apply to All</strong>: Batch process all images in the current set with the same settings</li>
+                            <li><strong>Undo All</strong>: Revert all changes back to original state</li>
+                        </ul>
+                        <p style="margin-top: 1rem;">Grid view and single-image preview modes let you efficiently review results before final export.</p>
+                    </div>
+                    
+                    <div class="code-block">
+        Algorithm: Color Distribution Alignment<br>
+        Strength: 85% | Exposure: +1.2<br>
+        Preset: "Studio Portraits"<br>
+        Status: Ready for batch application
+                    </div>
+
+                    <!-- Reference-Based Matching Tutorial -->
+                    <div style="background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%); color: white; padding: 3rem; border-radius: var(--radius-lg); margin-top: 3rem;">
+                        <h4 style="font-size: 2rem; margin-bottom: 1rem; color: white;">🎯 Multi-Camera Consistency Tutorial</h4>
+                        <p style="opacity: 0.95; margin-bottom: 2rem; font-size: 1.1rem;">Use Color Distribution Alignment to ensure consistent look across images from different cameras or lighting conditions.</p>
+
+                        <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: var(--radius-md); padding: 2rem; margin-bottom: 2rem;">
+                            <h5 style="color: white; margin-bottom: 1.5rem; font-size: 1.3rem;">Workflow Steps:</h5>
+                            
+                            <div style="display: grid; gap: 1.5rem;">
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">1</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Select Reference Image</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Choose the image with the desired color and exposure as your reference. This could be from your main camera or the best-lit shot.</p>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">2</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Load Target Images</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Import all images that need color matching (from secondary cameras, different time of day, various lighting setups).</p>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">3</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Select Color Distribution Alignment</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Choose this algorithm from the dropdown. The app analyzes the reference image's LAB color space distribution.</p>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">4</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Adjust Strength Parameter</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Use the Correction Strength slider (0-100%) to control how closely target images match the reference. Start at 70-85%.</p>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">5</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Preview & Compare</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Use split-view to compare before/after. Check multiple images in grid view to ensure consistent results across the batch.</p>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; align-items: start;">
+                                    <div style="min-width: 40px; height: 40px; background: white; color: #FF6B35; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2rem;">6</div>
+                                    <div>
+                                        <h6 style="color: white; margin-bottom: 0.5rem; font-size: 1.1rem;">Apply to All</h6>
+                                        <p style="opacity: 0.9; font-size: 0.95rem;">Click "Apply to All" to batch process all target images with the same reference-based correction.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: var(--radius-md); padding: 1.5rem;">
+                            <h6 style="color: white; margin-bottom: 1rem; font-size: 1.1rem;">💡 Perfect For:</h6>
+                            <ul style="margin-left: 1.5rem; opacity: 0.95; line-height: 1.8;">
+                                <li><strong>Wedding Photography:</strong> Match images from multiple photographers/cameras</li>
+                                <li><strong>Event Coverage:</strong> Ensure consistent look across different lighting zones</li>
+                                <li><strong>Product Photography:</strong> Match new shots to existing catalog style</li>
+                                <li><strong>Film Emulation:</strong> Transfer color characteristics from reference film scans</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SETTINGS -->
+                <div id="settings" class="subsection">
+                    <h3 class="subsection-title">D. Settings Page</h3>
+                    <p>Allows for workspace personalization and external tool integration.</p>
+                    
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>Theme</h4>
+                            <p>Toggle between "Dark Mode" and "System Theme" for comfortable editing in any lighting.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Accent Color</h4>
+                            <p>Customize UI highlights: Blue, Grey, Purple, Pink, Red, Orange, Amber, Green, Teal, Cyan.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>Export Application</h4>
+                            <p>Configure external apps by setting executable path (e.g., C:\Program Files\Krita\bin\krita.exe).</p>
+                        </div>
+                    </div>
+                    
+                    <div class="tip-box">
+                        <strong>Pro Tip:</strong> Use the export application setting to open sorted folders directly in Photoshop, Lightroom, or Krita with one click.
+                    </div>
+                    
+                    <div class="code-block">
+        Executable Path: C:\Program Files\Adobe\Photoshop\photoshop.exe<br>
+        Launch Mode: With Admin Rights<br>
+        Auto-Open: Enabled<br>
+        File Association: *.psd, *.tiff, *.png
+                    </div>
+                </div>
+            </section>
+
+            <!-- Future Enhancement: Add Troubleshooting section for common errors (dcraw missing, Java errors, RAW format issues) -->
+            <!-- Future Enhancement: Add Performance Tips section (RAM recommendations, batch size limits, optimal settings) -->
+            <!-- Future Enhancement: Add Preset Library section with downloadable starter presets and import instructions -->
+            <!-- Future Enhancement: Add CSV Export Guide showing how to analyze feature data in Excel/Google Sheets -->
+
+        </main>
+    </div>
+    
+    <footer role="contentinfo" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+        <p>&copy; 2026 KUONIX. All rights reserved.</p>
+    </footer>
+</body>
+</html>
