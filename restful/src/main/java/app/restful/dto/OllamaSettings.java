@@ -23,7 +23,7 @@ public record OllamaSettings(
         return new OllamaSettings(
             false,                          // disabled by default
             "",                              // user must provide API key
-            "llama3.1:8b",                  // default model
+            "qwen3.5:cloud",                // default cloud model
             "https://api.ollama.com",       // Ollama Cloud
             0.3,                             // balanced creativity
             1024                             // reasonable response length

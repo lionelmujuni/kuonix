@@ -84,14 +84,14 @@ public class SettingsController {
     @GetMapping("/ollama/models")
     public List<ModelOption> getAvailableModels() {
         return List.of(
-            new ModelOption("minimax-m2.1:cloud",       "minimax-m2.1:cloud",        "Exceptional multilingual capabilities"),
-            new ModelOption("gemma3:4b-cloud",         "Gemma 3 (4B)",          "Google's latest, small"),
-            new ModelOption("gemma3:12b-cloud",         "Gemma 3 (12B)",          "Google's latest, mid-size"),
-            new ModelOption("gemma3:27b-cloud",         "Gemma 3 (27B)",          "Google's latest, large"),
-            new ModelOption("deepseek-v3.1:671b-cloud",        "deepseek-v3.1 (671B)",         "DeepSeek model"),
-            new ModelOption("qwen3-vl:235b-cloud",        "Qwen 3 VL (235B)",         "Most powerful vision-language model in the Qwen family"),
-            new ModelOption("gpt-oss:20b-cloud",          "gpt-oss (20b)",           "OpenAI's open-weight model"),
-            new ModelOption("kimi-k2-thinking:cloud",    "kimi-k2-thinking",      "Moonshot AI's best open-source thinking model")
+            new ModelOption("qwen3.5:cloud",            "Qwen 3.5",              "Best all-rounder, vision + tools + thinking"),
+            new ModelOption("gemma4:31b-cloud",         "Gemma 4 (31B)",          "Google's latest, vision + tools + thinking + audio"),
+            new ModelOption("minimax-m2.7:cloud",       "MiniMax M2.7",           "Coding and agentic workflows"),
+            new ModelOption("kimi-k2.5:cloud",          "Kimi K2.5",              "Multimodal agentic, vision + tools"),
+            new ModelOption("glm-5.1:cloud",            "GLM 5.1",                "Flagship agentic engineering model"),
+            new ModelOption("qwen3-coder-next:cloud",   "Qwen3 Coder Next",       "Optimized for coding agents"),
+            new ModelOption("devstral-small-2:24b-cloud", "Devstral Small 2 (24B)", "Tool use for codebases"),
+            new ModelOption("nemotron-3-nano:30b-cloud", "Nemotron 3 Nano (30B)",  "NVIDIA efficient agentic model")
         );
     }
 

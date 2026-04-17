@@ -2,9 +2,12 @@ package app.restful.api;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import app.restful.agent.KuonixAgentTools;
 import app.restful.agent.KuonixAiService;
+import dev.langchain4j.service.TokenStream;
 
 @RestController
 @RequestMapping("/agent")
@@ -42,9 +46,11 @@ public class AgentController {
     }
 
     public record AgentChatRequest(
-            String sessionId,   // opaque key for per-session memory
-            String message,     // user's chat message
-            String imagePath    // optional: active image in the Color Lab (may be null)
+            String sessionId,      // opaque key for per-session memory
+            String message,        // user's chat message
+            String imagePath,      // optional: active image in the Color Lab (may be null)
+            Map<String, Object> imageFeatures,  // pre-computed analysis metrics (may be null)
+            List<String> imageIssues   // pre-computed classification issues (may be null)
     ) {}
 
     /**
@@ -72,26 +78,78 @@ public class AgentController {
 
         executor.submit(() -> {
             try {
-                String response = aiService.chat(req.sessionId(), effectiveMessage);
-                emitter.send(SseEmitter.event().name("token").data(response));
+                TokenStream stream = aiService.chat(req.sessionId(), effectiveMessage);
 
-                // Check side-channel for correction previews generated during tool calls
-                KuonixAgentTools.CorrectionPreview correction = KuonixAgentTools.consumePendingCorrection();
-                if (correction != null) {
-                    Map<String, Object> payload = new HashMap<>();
-                    payload.put("base64", correction.base64());
-                    payload.put("method", correction.method());
-                    payload.put("params", correction.params());
-                    emitter.send(SseEmitter.event()
-                            .name("correction")
-                            .data(objectMapper.writeValueAsString(payload)));
-                    log.info("[agent/chat] sent correction preview: method={}", correction.method());
-                }
+                // Guard all emitter operations — once completed/errored, no further sends.
+                AtomicBoolean emitterDone = new AtomicBoolean(false);
 
-                emitter.send(SseEmitter.event().name("done").data("[DONE]"));
-                emitter.complete();
+                // Capture correction preview on the tool-execution thread (same thread
+                // as the @Tool method), then read it in onCompleteResponse. ThreadLocal
+                // would fail here because onCompleteResponse runs on a different thread.
+                AtomicReference<KuonixAgentTools.CorrectionPreview> correctionRef =
+                        new AtomicReference<>();
+
+                stream
+                    .onPartialResponse(token -> {
+                        if (emitterDone.get()) return;
+                        try {
+                            emitter.send(SseEmitter.event().name("token").data(token));
+                        } catch (IOException e) {
+                            emitterDone.set(true);
+                            log.debug("[agent/chat] client disconnected during streaming");
+                        }
+                    })
+                    .onToolExecuted(toolExecution -> {
+                        if ("previewCorrection".equals(toolExecution.request().name())) {
+                            KuonixAgentTools.CorrectionPreview preview =
+                                    KuonixAgentTools.consumePendingCorrection();
+                            if (preview != null) {
+                                correctionRef.set(preview);
+                                log.info("[agent/chat] captured correction preview from tool: method={}",
+                                        preview.method());
+                            }
+                        }
+                    })
+                    .onCompleteResponse(response -> {
+                        if (emitterDone.compareAndSet(false, true)) {
+                            KuonixAgentTools.CorrectionPreview correction = correctionRef.get();
+                            if (correction != null) {
+                                try {
+                                    Map<String, Object> payload = new HashMap<>();
+                                    payload.put("base64", correction.base64());
+                                    payload.put("method", correction.method());
+                                    payload.put("params", correction.params());
+                                    emitter.send(SseEmitter.event()
+                                            .name("correction")
+                                            .data(objectMapper.writeValueAsString(payload)));
+                                    log.info("[agent/chat] sent correction preview: method={}", correction.method());
+                                } catch (IOException e) {
+                                    log.warn("[agent/chat] failed to send correction event", e);
+                                }
+                            }
+                            try {
+                                emitter.send(SseEmitter.event().name("done").data("[DONE]"));
+                                emitter.complete();
+                            } catch (IOException e) {
+                                emitter.completeWithError(e);
+                            }
+                        }
+                    })
+                    .onError(e -> {
+                        log.error("[agent/chat] stream error", e);
+                        if (emitterDone.compareAndSet(false, true)) {
+                            try {
+                                emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+                                emitter.complete();
+                            } catch (IOException ioEx) {
+                                emitter.completeWithError(ioEx);
+                            }
+                        }
+                    })
+                    .start();
+
             } catch (Exception e) {
-                log.error("[agent/chat] error", e);
+                log.error("[agent/chat] startup error", e);
                 try {
                     emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
                     emitter.complete();
@@ -110,9 +168,30 @@ public class AgentController {
      * having to type it every time.
      */
     private String buildMessage(AgentChatRequest req) {
-        if (req.imagePath() != null && !req.imagePath().isBlank()) {
-            return "[Active image: " + req.imagePath() + "]\n" + req.message();
+        if (req.imagePath() == null || req.imagePath().isBlank()) {
+            return req.message();
         }
-        return req.message();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("[Active image: ").append(req.imagePath()).append("]\n");
+
+        // Inject pre-computed analysis so the LLM skips redundant tool calls
+        if (req.imageFeatures() != null && !req.imageFeatures().isEmpty()) {
+            try {
+                sb.append("[Analysis already done — features: ")
+                  .append(objectMapper.writeValueAsString(req.imageFeatures()))
+                  .append("]\n");
+            } catch (Exception e) {
+                log.warn("[agent/chat] failed to serialize imageFeatures", e);
+            }
+        }
+        if (req.imageIssues() != null && !req.imageIssues().isEmpty()) {
+            sb.append("[Issues already detected: ")
+              .append(String.join(", ", req.imageIssues()))
+              .append("]\n");
+        }
+
+        sb.append(req.message());
+        return sb.toString();
     }
 }

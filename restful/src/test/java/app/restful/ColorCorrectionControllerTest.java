@@ -169,7 +169,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "gray_world",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -196,7 +197,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "shades_of_gray",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -216,7 +218,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "invalid_method_name",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -236,6 +239,8 @@ public class ColorCorrectionControllerTest {
             "gray_world",
             params,
             "/nonexistent/path/image.jpg"
+,
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -257,7 +262,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "exposure",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -278,7 +284,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "saturation",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -301,7 +308,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "gray_world",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -329,6 +337,8 @@ public class ColorCorrectionControllerTest {
             "gray_world",
             params,
             "/nonexistent/image.jpg"
+,
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -352,7 +362,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_matrix",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -379,7 +390,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -403,7 +415,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -425,7 +438,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -447,7 +461,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -470,7 +485,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -493,7 +509,8 @@ public class ColorCorrectionControllerTest {
         ColorCorrectionRequest request = new ColorCorrectionRequest(
             "color_distribution_alignment",
             params,
-            testImagePath.toString()
+            testImagePath.toString(),
+            null
         );
 
         ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
@@ -540,7 +557,8 @@ public class ColorCorrectionControllerTest {
             ColorCorrectionRequest request = new ColorCorrectionRequest(
                 method.id(),
                 params,
-                testImagePath.toString()
+                testImagePath.toString(),
+                null
             );
 
             ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(

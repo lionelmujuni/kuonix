@@ -356,6 +356,13 @@
                         <button class="cc-tool-btn" id="ccToolRedo" title="Redo">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
+                        <div class="cc-toolbar-divider"></div>
+                        <button class="cc-tool-btn" id="ccToolSelect" title="Rectangle Selection (apply correction to region only)">
+                            <i class="bi bi-bounding-box"></i>
+                        </button>
+                        <button class="cc-tool-btn" id="ccToolClearSelection" title="Clear Selection" style="display:none;">
+                            <i class="bi bi-x-square"></i>
+                        </button>
                     </div>
                     
                     <!-- Category Selector (moved inside toolbar) -->
@@ -438,9 +445,11 @@
                                 <p>Select an image from the grid to begin</p>
                             </div>
                             
-                            <div class="cc-image-container" id="ccImageContainer" style="display:none;">
+                            <div class="cc-image-container" id="ccImageContainer" style="display:none; position:relative;">
                                 <img id="ccOriginalImage" class="cc-preview-image" alt="Original">
                                 <img id="ccCorrectedImage" class="cc-preview-image cc-corrected" alt="Corrected" style="display:none;">
+                                <canvas id="ccSelectionCanvas" class="cc-selection-canvas"></canvas>
+                                <div id="ccSelectionBadge" class="cc-selection-badge">Region selected</div>
                                 
                                 <!-- Draggable split-view comparator -->
                                 <div class="cc-split-overlay" id="ccSplitOverlay" style="display:none;">
@@ -479,6 +488,26 @@
                 <div class="cc-controls-panel">
                     <h3 style="margin: 0 0 16px 0; font-size: 16px;">Controls</h3>
                     
+                    <!-- Histogram Panel -->
+                    <details class="cc-histogram-panel" open>
+                        <summary class="cc-theory-header">
+                            <i class="bi bi-bar-chart-line"></i>
+                            <span>Histogram</span>
+                            <i class="bi bi-chevron-down cc-chevron"></i>
+                        </summary>
+                        <div class="cc-histogram-body">
+                            <canvas id="ccHistogramCanvas" class="cc-histogram-canvas" width="256" height="72"></canvas>
+                            <div class="cc-histogram-legend">
+                                <span class="cc-hist-lum">Lum</span>
+                                <span class="cc-hist-r">R</span>
+                                <span class="cc-hist-g">G</span>
+                                <span class="cc-hist-b">B</span>
+                            </div>
+                        </div>
+                    </details>
+
+                    <hr style="margin: 16px 0; opacity: 0.3;">
+
                     <!-- Algorithm dropdown selector -->
                     <div class="form-group">
                         <label class="form-label">Algorithm</label>
@@ -550,6 +579,13 @@
                                     <i class="bi bi-stars" style="font-size: 20px; color: var(--color-primary);"></i>
                                     <p>Ask me to analyse your image, explain any issues, or suggest corrections.</p>
                                 </div>
+                            </div>
+                            <!-- Quick-action chips -->
+                            <div class="agent-quick-actions">
+                                <button class="agent-chip" data-prompt="Analyse this image and tell me what issues you find.">Analyse image</button>
+                                <button class="agent-chip" data-prompt="What is the single most impactful correction I should apply?">Suggest correction</button>
+                                <button class="agent-chip" data-prompt="What's wrong with this photo?">What's wrong?</button>
+                                <button class="agent-chip" data-prompt="Generate a preview with the best white balance correction for this image.">Fix white balance</button>
                             </div>
                             <!-- Input row -->
                             <div class="agent-input-row">

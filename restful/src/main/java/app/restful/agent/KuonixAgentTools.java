@@ -30,8 +30,9 @@ import dev.langchain4j.agent.tool.Tool;
  * arbitrary files on the host system (principle of least privilege).</p>
  *
  * <p>Correction previews are stored in a ThreadLocal side-channel so the
- * AgentController can send them as dedicated SSE events — the LLM never
- * sees or needs to echo the raw Base64 data.</p>
+ * AgentController can capture them via the {@code onToolExecuted} callback
+ * (which runs on the same thread as the tool) and forward them as
+ * dedicated SSE events — the LLM never sees the raw Base64 data.</p>
  */
 @Component
 public class KuonixAgentTools {
@@ -40,7 +41,8 @@ public class KuonixAgentTools {
 
     /**
      * Side-channel for correction previews generated during a tool call.
-     * Set by previewCorrection(), consumed by AgentController after chat().
+     * Set by previewCorrection(), consumed by AgentController's onToolExecuted
+     * callback (which runs on the same thread as the @Tool method).
      */
     public record CorrectionPreview(String base64, String method, Map<String, Object> params) {}
     private static final ThreadLocal<CorrectionPreview> pendingCorrection = new ThreadLocal<>();
@@ -131,12 +133,12 @@ public class KuonixAgentTools {
 
     @Tool("Generate a corrected preview of an image and return a JSON object with the Base64 JPEG data URL, " +
           "the correction method, and parameters used. " +
-          "Available methods: gray_world, white_patch, shades_of_gray, exposure, " +
+          "Available methods: temperature_tint, gray_world, white_patch, shades_of_gray, exposure, " +
           "saturation, color_matrix, color_distribution_alignment. " +
           "Always call previewCorrection before applyCorrection so the user can confirm.")
     public String previewCorrection(
             @P("Absolute file path of the image") String imagePath,
-            @P("Correction method id: gray_world | white_patch | shades_of_gray | " +
+            @P("Correction method id: temperature_tint | gray_world | white_patch | shades_of_gray | " +
                "exposure | saturation | color_matrix | color_distribution_alignment") String method,
             @P("JSON object of parameter name to numeric value, e.g. {\"gain\": 1.2}. " +
                "Use {} when the method needs no parameters.") String parametersJson) {

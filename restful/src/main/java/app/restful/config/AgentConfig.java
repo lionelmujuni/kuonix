@@ -54,13 +54,13 @@ public class AgentConfig {
             @Override
             public void onRequest(ChatModelRequestContext ctx) {
                 log.debug("[llm] request model={} messages={}",
-                        ctx.request().model(),
-                        ctx.request().messages().size());
+                        ctx.chatRequest().modelName(),
+                        ctx.chatRequest().messages().size());
             }
 
             @Override
             public void onResponse(ChatModelResponseContext ctx) {
-                var usage = ctx.response().tokenUsage();
+                var usage = ctx.chatResponse().tokenUsage();
                 if (usage != null) {
                     log.info("[llm] response inputTokens={} outputTokens={} totalTokens={}",
                             usage.inputTokenCount(),

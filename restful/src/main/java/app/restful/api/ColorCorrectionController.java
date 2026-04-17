@@ -120,6 +120,32 @@ public class ColorCorrectionController {
                 )
             ),
             new ColorCorrectionMethod(
+                "temperature_tint",
+                "Temperature & Tint",
+                "Manual white balance using colour temperature (Kelvin) and green/magenta tint. Standard in every professional RAW editor.",
+                "Temperature & Tint gives direct manual control over white balance. Colour temperature (in Kelvin) shifts the image from warm/orange (low K) to cool/blue (high K) using the Planckian locus — the curve traced by a black-body radiator. Tint adjusts the perpendicular axis, adding green (+) or magenta (−) to compensate for non-blackbody light sources such as fluorescent tubes. Per-channel gains are normalised so no channel clips. This covers the same two-parameter space as the WB sliders in Adobe Camera Raw and Lightroom.",
+                List.of(
+                    new ColorCorrectionMethod.Parameter(
+                        "tempK",
+                        "Colour Temperature (K)",
+                        5500.0,
+                        2000.0,
+                        10000.0,
+                        50.0,
+                        "Kelvin value. 2000–3500 K = warm/candlelight, 5000–6500 K = daylight, 7000–10000 K = overcast/shade"
+                    ),
+                    new ColorCorrectionMethod.Parameter(
+                        "tint",
+                        "Tint",
+                        0.0,
+                        -1.0,
+                        1.0,
+                        0.05,
+                        "Green ↔ Magenta bias. Positive = more green, negative = more magenta"
+                    )
+                )
+            ),
+            new ColorCorrectionMethod(
                 "color_distribution_alignment",
                 "Color Distribution Alignment",
                 "Matches source image's color statistics (mean, std) to a reference image. Enables consistent color grading across multiple images.",
@@ -165,9 +191,10 @@ public class ColorCorrectionController {
             }
 
             String base64Image = colorCorrection.processImageToBase64(
-                imagePath, 
-                request.method(), 
-                request.parameters()
+                imagePath,
+                request.method(),
+                request.parameters(),
+                request.region()
             );
 
             return ResponseEntity.ok(
@@ -217,7 +244,8 @@ public class ColorCorrectionController {
                 inputPath,
                 outputPath,
                 request.method(),
-                request.parameters()
+                request.parameters(),
+                request.region()
             );
 
             return ResponseEntity.ok(

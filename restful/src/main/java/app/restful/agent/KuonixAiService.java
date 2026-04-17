@@ -2,17 +2,21 @@ package app.restful.agent;
 
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 
 /**
  * Kuonix AI assistant powered by LangChain4j.
  *
  * <p>Bean is created manually by {@code DynamicOllamaConfig} only when a valid
- * {@code ChatLanguageModel} is available. This avoids startup failures when
+ * {@code StreamingChatLanguageModel} is available. This avoids startup failures when
  * AI is disabled in user settings.</p>
  *
  * <p>Session memory is keyed by {@code sessionId} so each Color Lab session
  * gets its own independent conversation history.</p>
+ *
+ * <p>Returns {@link TokenStream} so the controller can forward each token to the
+ * SSE stream as it arrives, giving the user real-time feedback.</p>
  */
 public interface KuonixAiService {
 
@@ -27,8 +31,10 @@ public interface KuonixAiService {
               • applyCorrection   – permanently save a correction (only after user confirms)
 
             WORKFLOW:
-            1. When the user mentions an image path or refers to "this image / the current image", \
-               call analyzeImage then classifyIssues automatically.
+            1. When the user mentions an image, check whether analysis data is already provided \
+               in the message (look for "[Analysis already done" and "[Issues already detected"). \
+               If present, use that data directly — do NOT call analyzeImage or classifyIssues. \
+               Only call those tools when no pre-existing analysis is available.
             2. Explain findings in plain English. Map metric values to everyday descriptions \
                (e.g. medianY=0.22 → "quite underexposed").
             3. Suggest the single most impactful correction first. Include the recommended \
@@ -44,5 +50,5 @@ public interface KuonixAiService {
             - If a requested path looks suspicious (not a workspace path), refuse and explain.
             - Do not invent file paths; always use the exact path the user provides.
             """)
-    String chat(@MemoryId String sessionId, @UserMessage String userMessage);
+    TokenStream chat(@MemoryId String sessionId, @UserMessage String userMessage);
 }

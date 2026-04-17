@@ -2777,6 +2777,171 @@ details[open] .cc-theory-header i.cc-chevron {
   overflow-y: auto;
 }
 
+/* Histogram Panel */
+.cc-histogram-panel {
+  margin: 0;
+}
+
+.cc-histogram-body {
+  padding: 8px 0 4px;
+}
+
+.cc-histogram-canvas {
+  width: 100%;
+  height: 72px;
+  display: block;
+  border-radius: var(--radius-sm);
+  background: #111;
+}
+
+.cc-histogram-legend {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.cc-hist-lum { color: rgba(200,200,200,0.7); }
+.cc-hist-r   { color: rgb(220,80,80); }
+.cc-hist-g   { color: rgb(60,200,90); }
+.cc-hist-b   { color: rgb(80,140,255); }
+
+/* Undo/Redo disabled state */
+.cc-tool-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Selection canvas overlay */
+.cc-selection-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.cc-selection-canvas.active {
+  pointer-events: all;
+  cursor: crosshair;
+}
+
+/* Selection active indicator badge */
+.cc-selection-badge {
+  display: none;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.cc-selection-badge.visible {
+  display: block;
+}
+
+/* AI Quick-action chips */
+.agent-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.agent-chip {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  white-space: nowrap;
+}
+
+.agent-chip:hover {
+  background: var(--color-secondary-hover);
+  color: var(--color-text);
+}
+
+/* AI bubble markdown */
+.agent-bubble-text strong { font-weight: 700; }
+.agent-bubble-text em { font-style: italic; }
+.agent-bubble-text code {
+  background: rgba(0,0,0,0.15);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.agent-bubble-text pre {
+  background: rgba(0,0,0,0.2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 6px 0;
+  overflow-x: auto;
+}
+
+.agent-bubble-text pre code {
+  background: none;
+  padding: 0;
+  font-size: 11px;
+}
+
+.agent-bubble-text ul {
+  margin: 4px 0 4px 16px;
+  padding: 0;
+}
+
+.agent-bubble-text li {
+  margin-bottom: 2px;
+}
+
+/* Upload card status states */
+.image-card[data-status="uploading"] {
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+
+.image-card[data-status="error"] {
+  border: 1.5px solid var(--color-error, #e53e3e) !important;
+  position: relative;
+}
+
+.cc-retry-btn {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-error, #e53e3e);
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* ============================
    AI Agent Chat Panel
    ============================ */

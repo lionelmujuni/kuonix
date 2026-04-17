@@ -14,8 +14,8 @@ import app.restful.agent.KuonixAiService;
 import app.restful.dto.OllamaSettings;
 import app.restful.services.SettingsService;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
-import dev.langchain4j.model.chat.ChatLanguageModel;
-import dev.langchain4j.model.ollama.OllamaChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.service.AiServices;
 
 /**
@@ -36,31 +36,29 @@ public class DynamicOllamaConfig {
     /**
      * Create Ollama streaming chat model from user settings.
      * Only created when settings are valid and enabled.
-     * 
-     * Returns null if disabled or misconfigured, which prevents @AiService beans from being created.
+     *
+     * Returns null if disabled or misconfigured, which prevents KuonixAiService from being created.
      */
     @Bean
-    public ChatLanguageModel chatLanguageModel(SettingsService settingsService) {
+    public StreamingChatModel streamingChatModel(SettingsService settingsService) {
         OllamaSettings settings = settingsService.getOllamaSettings();
 
         if (!settings.enabled()) {
             log.info("Ollama AI is disabled in user settings. AI features unavailable.");
-            log.info("Enable via Settings UI in the application.");
             return null;
         }
 
         if (settings.apiKey() == null || settings.apiKey().isBlank()) {
             log.warn("Ollama API key not configured. AI features unavailable.");
-            log.warn("Configure API key via Settings UI in the application.");
             return null;
         }
 
-        log.info("Configuring Ollama Cloud: model={}, url={}", settings.modelName(), settings.baseUrl());
+        log.info("Configuring Ollama Cloud streaming: model={}, url={}", settings.modelName(), settings.baseUrl());
 
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + settings.apiKey());
 
-        return OllamaChatModel.builder()
+        return OllamaStreamingChatModel.builder()
                 .baseUrl(settings.baseUrl())
                 .modelName(settings.modelName())
                 .temperature(settings.temperature())
@@ -77,12 +75,12 @@ public class DynamicOllamaConfig {
             SettingsService settingsService,
             ChatMemoryProvider chatMemoryProvider,
             KuonixAgentTools tools) {
-        ChatLanguageModel chatModel = chatLanguageModel(settingsService);
-        if (chatModel == null) {
+        StreamingChatModel streamingModel = streamingChatModel(settingsService);
+        if (streamingModel == null) {
             return null;
         }
         return AiServices.builder(KuonixAiService.class)
-                .chatLanguageModel(chatModel)
+                .streamingChatModel(streamingModel)
                 .chatMemoryProvider(chatMemoryProvider)
                 .tools(tools)
                 .build();

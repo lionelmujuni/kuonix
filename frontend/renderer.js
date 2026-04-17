@@ -1363,11 +1363,20 @@ window.addEventListener('DOMContentLoaded', () => {
           
           if (!upRes.ok) {
             const errorData = await upRes.json().catch(() => ({ message: `HTTP ${upRes.status}: ${upRes.statusText}` }));
+            // Mark all non-RAW cards as errored
+            imagesToUpload.forEach(img => {
+              const card = document.querySelector(`[data-image-id="${img.id}"]`);
+              if (card) card.dataset.status = 'error';
+            });
             throw new Error(errorData.message || `Upload failed: ${upRes.status}`);
           }
-          
+
           const upData = await upRes.json();
           if (!upData.success) {
+            imagesToUpload.forEach(img => {
+              const card = document.querySelector(`[data-image-id="${img.id}"]`);
+              if (card) card.dataset.status = 'error';
+            });
             throw new Error(upData.message || "Upload failed");
           }
           
@@ -1433,6 +1442,23 @@ window.addEventListener('DOMContentLoaded', () => {
                       progressBar.style.width = `${analysisProgress}%`;
                       progressPercent.textContent = `${Math.round(analysisProgress)}%`;
                       progressText.textContent = `Analyzing ${parsed.current}/${parsed.total} images...`;
+
+                      // Per-card status: mark the card currently being processed
+                      if (parsed.path) {
+                        const imgIdx = uploadedImages.findIndex(i => i.serverPath === parsed.path || i.name === parsed.path?.split(/[\\/]/).pop());
+                        if (imgIdx !== -1) {
+                          const card = document.querySelector(`[data-image-id="${uploadedImages[imgIdx].id}"]`);
+                          if (card) card.dataset.status = 'uploading';
+                        }
+                        // Mark previous card as done
+                        if (parsed.current > 1) {
+                          const prevIdx = imgIdx - 1;
+                          if (prevIdx >= 0) {
+                            const prevCard = document.querySelector(`[data-image-id="${uploadedImages[prevIdx].id}"]`);
+                            if (prevCard) prevCard.dataset.status = 'done';
+                          }
+                        }
+                      }
                     } else if (eventType === 'complete') {
                       resolve(parsed);
                     } else if (eventType === 'error') {
@@ -1470,6 +1496,7 @@ window.addEventListener('DOMContentLoaded', () => {
           const libraryImg = libraryImages.find(lib => lib.id === uploadedImages[i].id);
           if (libraryImg) {
             libraryImg.issues = uploadedImages[i].issues;
+            libraryImg.features = uploadedImages[i].features;
             libraryImg.path = paths[i]; // Store backend path for Color Correction Lab
           }
         }
@@ -1480,6 +1507,9 @@ window.addEventListener('DOMContentLoaded', () => {
         progressBar.style.width = '100%';
         progressPercent.textContent = '100%';
         progressText.textContent = 'Complete!';
+
+        // Clear per-card status indicators
+        document.querySelectorAll('.image-card[data-status]').forEach(c => delete c.dataset.status);
 
         // Step 4: Update UI
         displayImageGrid(); // Re-render with badges
@@ -2966,7 +2996,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // Category-to-method mapping (workflow-ordered)
   const methodCategories = {
-    white_balance: ['gray_world', 'white_patch', 'shades_of_gray'],
+    white_balance: ['temperature_tint', 'gray_world', 'white_patch', 'shades_of_gray'],
     exposure: ['exposure'],
     saturation: ['saturation'],
     advanced: ['color_matrix', 'color_distribution_alignment']
@@ -2977,6 +3007,11 @@ window.addEventListener('DOMContentLoaded', () => {
   let ccSessionImages = []; // Images currently in Color Correction Lab
   let ccCurrentImageIndex = 0; // Index of currently displayed image
   let ccCorrectionResults = {}; // Store correction results: {imagePath: {method, parameters, applied, base64}}
+
+  // Undo/Redo stacks — keyed by imagePath, each entry: {method, parameters, base64}
+  const CC_UNDO_MAX = 15;
+  let ccUndoStacks = {}; // {imagePath: [{method, parameters, base64}, ...]}
+  let ccRedoStacks = {}; // {imagePath: [{method, parameters, base64}, ...]}
 
   // Load available methods from backend
   async function loadColorCorrectionMethods() {
@@ -3296,13 +3331,21 @@ window.addEventListener('DOMContentLoaded', () => {
     ccCorrectedImage.style.display = 'none';
 
     try {
+      // Build normalised region payload (0–1) if a selection is active
+      let region = null;
+      if (SelectionTool && SelectionTool.active && SelectionTool.rect) {
+        const r = SelectionTool.rect;
+        region = { x: r.x, y: r.y, width: r.w, height: r.h };
+      }
+
       const response = await fetch('http://localhost:8081/color-correct/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           method: ccCurrentMethod,
           parameters: ccCurrentParameters,
-          imagePath: ccCurrentImagePath
+          imagePath: ccCurrentImagePath,
+          region
         })
       });
 
@@ -3335,6 +3378,16 @@ window.addEventListener('DOMContentLoaded', () => {
             saved: false
           };
           updateSaveButtonStates();
+
+          // Push to undo stack, clear redo stack
+          const path = ccCurrentImagePath;
+          if (!ccUndoStacks[path]) ccUndoStacks[path] = [];
+          if (!ccRedoStacks[path]) ccRedoStacks[path] = [];
+          ccUndoStacks[path].push({ method: ccCurrentMethod, parameters: { ...ccCurrentParameters }, base64: result.base64Image });
+          if (ccUndoStacks[path].length > CC_UNDO_MAX) ccUndoStacks[path].shift();
+          ccRedoStacks[path] = [];
+          updateUndoRedoButtonStates();
+          drawHistogram(ccCorrectedImage);
         }
       } else {
         throw new Error(result.message);
@@ -3375,6 +3428,9 @@ window.addEventListener('DOMContentLoaded', () => {
       container.style.setProperty('--split-pos', '0%');
       ccBeforeAfterToggle.innerHTML = '<i class="bi bi-eye"></i> After';
     }
+
+    // Re-sync selection canvas after layout change
+    requestAnimationFrame(() => SelectionTool._syncCanvas());
   }
 
   // Cycle compare modes on button click
@@ -3695,8 +3751,9 @@ window.addEventListener('DOMContentLoaded', () => {
     
     updateNavigationState();
     updateSaveButtonStates();
+    updateUndoRedoButtonStates();
   }
-  
+
   // Clear Color Correction Lab
   function clearColorCorrectionLab() {
     ccSessionImages = [];
@@ -3743,6 +3800,9 @@ window.addEventListener('DOMContentLoaded', () => {
     // Update toolbar buttons
     if (ccToolGridView) ccToolGridView.classList.remove('active');
     if (ccToolPreviewView) ccToolPreviewView.classList.add('active');
+
+    // Re-sync selection canvas after layout change
+    requestAnimationFrame(() => SelectionTool._syncCanvas());
   }
   
   /**
@@ -3834,7 +3894,244 @@ window.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  
+
+  // ============================
+  // ROI Selection Tool
+  // ============================
+
+  const ccToolSelect          = document.getElementById('ccToolSelect');
+  const ccToolClearSelection  = document.getElementById('ccToolClearSelection');
+  const ccSelectionCanvas     = document.getElementById('ccSelectionCanvas');
+  const ccSelectionBadge      = document.getElementById('ccSelectionBadge');
+
+  const SelectionTool = {
+    active: false,
+    rect: null,       // {x, y, w, h} normalised 0-1 relative to displayed image
+    _dragging: false,
+    _startX: 0, _startY: 0,
+
+    toggle() {
+      this.active = !this.active;
+      ccToolSelect.classList.toggle('active', this.active);
+      if (this.active) {
+        ccSelectionCanvas.classList.add('active');
+      } else {
+        ccSelectionCanvas.classList.remove('active');
+        this.rect = null;
+        this._clearCanvas();
+        ccSelectionBadge.classList.remove('visible');
+        if (ccToolClearSelection) ccToolClearSelection.style.display = 'none';
+      }
+      // Reapply correction so server knows whether region is active
+      if (ccCurrentImagePath && ccCurrentMethod) applyColorCorrection();
+    },
+
+    clear() {
+      this.rect = null;
+      this._clearCanvas();
+      ccSelectionBadge.classList.remove('visible');
+      if (ccToolClearSelection) ccToolClearSelection.style.display = 'none';
+      if (ccCurrentImagePath && ccCurrentMethod) applyColorCorrection();
+    },
+
+    /** Returns pixel-space rect relative to the natural image dimensions, or null. */
+    getPixelRect(naturalWidth, naturalHeight) {
+      if (!this.rect) return null;
+      return {
+        x: Math.round(this.rect.x * naturalWidth),
+        y: Math.round(this.rect.y * naturalHeight),
+        width:  Math.round(this.rect.w * naturalWidth),
+        height: Math.round(this.rect.h * naturalHeight)
+      };
+    },
+
+    _clearCanvas() {
+      if (!ccSelectionCanvas) return;
+      const ctx = ccSelectionCanvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, ccSelectionCanvas.width, ccSelectionCanvas.height);
+    },
+
+    _draw() {
+      if (!this.rect || !ccSelectionCanvas) return;
+      const canvas = ccSelectionCanvas;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const cw = canvas.width / dpr;
+      const ch = canvas.height / dpr;
+      ctx.clearRect(0, 0, cw, ch);
+
+      const x = this.rect.x * cw;
+      const y = this.rect.y * ch;
+      const w = this.rect.w * cw;
+      const h = this.rect.h * ch;
+
+      // Dimming outside selection
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.clearRect(x, y, w, h);
+
+      // Dashed border
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      ctx.setLineDash([]);
+
+      // Corner handles
+      const hs = 6;
+      ctx.fillStyle = '#fff';
+      [[x, y],[x+w, y],[x, y+h],[x+w, y+h]].forEach(([cx, cy]) =>
+        ctx.fillRect(cx - hs/2, cy - hs/2, hs, hs));
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    },
+
+    _syncCanvas() {
+      if (!ccSelectionCanvas || !ccImageContainer) return;
+      const rect = ccOriginalImage.getBoundingClientRect();
+      const containerRect = ccImageContainer.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      ccSelectionCanvas.style.left   = (rect.left - containerRect.left) + 'px';
+      ccSelectionCanvas.style.top    = (rect.top  - containerRect.top)  + 'px';
+      ccSelectionCanvas.style.width  = rect.width  + 'px';
+      ccSelectionCanvas.style.height = rect.height + 'px';
+      ccSelectionCanvas.width  = Math.round(rect.width  * dpr);
+      ccSelectionCanvas.height = Math.round(rect.height * dpr);
+      if (this.rect) this._draw();
+    },
+
+    _normCoords(e) {
+      const rect = ccSelectionCanvas.getBoundingClientRect();
+      return {
+        nx: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
+        ny: Math.max(0, Math.min(1, (e.clientY - rect.top)  / rect.height))
+      };
+    },
+
+    onPointerDown(e) {
+      if (!this.active) return;
+      e.preventDefault();
+      ccSelectionCanvas.setPointerCapture(e.pointerId);
+      const { nx, ny } = this._normCoords(e);
+      this._dragging = true;
+      this._startX = nx; this._startY = ny;
+      this.rect = null;
+      this._clearCanvas();
+    },
+
+    onPointerMove(e) {
+      if (!this._dragging) return;
+      const { nx, ny } = this._normCoords(e);
+      const x = Math.min(this._startX, nx);
+      const y = Math.min(this._startY, ny);
+      const w = Math.abs(nx - this._startX);
+      const h = Math.abs(ny - this._startY);
+      this.rect = { x, y, w, h };
+      this._draw();
+    },
+
+    onPointerUp(e) {
+      if (!this._dragging) return;
+      this._dragging = false;
+      if (this.rect && this.rect.w > 0.01 && this.rect.h > 0.01) {
+        ccSelectionBadge.classList.add('visible');
+        if (ccToolClearSelection) ccToolClearSelection.style.display = 'flex';
+        if (ccCurrentImagePath && ccCurrentMethod) applyColorCorrection();
+      } else {
+        this.rect = null;
+        this._clearCanvas();
+        ccSelectionBadge.classList.remove('visible');
+        if (ccToolClearSelection) ccToolClearSelection.style.display = 'none';
+      }
+    }
+  };
+
+  // Wire canvas pointer events
+  if (ccSelectionCanvas) {
+    ccSelectionCanvas.addEventListener('pointerdown', e => SelectionTool.onPointerDown(e));
+    ccSelectionCanvas.addEventListener('pointermove', e => SelectionTool.onPointerMove(e));
+    ccSelectionCanvas.addEventListener('pointerup',   e => SelectionTool.onPointerUp(e));
+  }
+
+  // Sync canvas size when images load or window resizes
+  if (ccOriginalImage) {
+    ccOriginalImage.addEventListener('load', () => SelectionTool._syncCanvas());
+  }
+  if (ccCorrectedImage) {
+    ccCorrectedImage.addEventListener('load', () => SelectionTool._syncCanvas());
+  }
+  window.addEventListener('resize', () => SelectionTool._syncCanvas());
+
+  // ResizeObserver catches CSS-driven layout changes (sidebar, compare mode, split drag)
+  if (ccImageContainer && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => SelectionTool._syncCanvas()).observe(ccImageContainer);
+  }
+
+  if (ccToolSelect) {
+    ccToolSelect.addEventListener('click', () => SelectionTool.toggle());
+  }
+  if (ccToolClearSelection) {
+    ccToolClearSelection.addEventListener('click', () => SelectionTool.clear());
+  }
+
+  // Undo/Redo toolbar buttons
+  const ccToolUndo = document.getElementById('ccToolUndo');
+  const ccToolRedo = document.getElementById('ccToolRedo');
+
+  function updateUndoRedoButtonStates() {
+    const path = ccCurrentImagePath;
+    if (ccToolUndo) ccToolUndo.disabled = !path || !(ccUndoStacks[path]?.length > 1);
+    if (ccToolRedo) ccToolRedo.disabled = !path || !(ccRedoStacks[path]?.length > 0);
+  }
+
+  function restoreHistoryEntry(entry) {
+    ccCurrentMethod = entry.method;
+    ccCurrentParameters = { ...entry.parameters };
+    ccCorrectedImage.src = entry.base64;
+    ccCorrectedImage.style.display = 'block';
+    if (ccCompareMode !== 'before') setCompareMode('split');
+    updateMethodControls(ccCurrentMethod);
+    updateTheoryContent(ccCurrentMethod);
+    if (ccCurrentImagePath) {
+      ccCorrectionResults[ccCurrentImagePath] = {
+        method: ccCurrentMethod,
+        parameters: { ...ccCurrentParameters },
+        base64: entry.base64,
+        applied: true,
+        saved: false
+      };
+      updateSaveButtonStates();
+    }
+    updateUndoRedoButtonStates();
+    drawHistogram(ccCorrectedImage);
+  }
+
+  if (ccToolUndo) {
+    ccToolUndo.disabled = true;
+    ccToolUndo.addEventListener('click', () => {
+      const path = ccCurrentImagePath;
+      if (!path || !ccUndoStacks[path] || ccUndoStacks[path].length <= 1) return;
+      if (!ccRedoStacks[path]) ccRedoStacks[path] = [];
+      const current = ccUndoStacks[path].pop();
+      ccRedoStacks[path].push(current);
+      restoreHistoryEntry(ccUndoStacks[path][ccUndoStacks[path].length - 1]);
+    });
+  }
+
+  if (ccToolRedo) {
+    ccToolRedo.disabled = true;
+    ccToolRedo.addEventListener('click', () => {
+      const path = ccCurrentImagePath;
+      if (!path || !ccRedoStacks[path] || ccRedoStacks[path].length === 0) return;
+      if (!ccUndoStacks[path]) ccUndoStacks[path] = [];
+      const entry = ccRedoStacks[path].pop();
+      ccUndoStacks[path].push(entry);
+      restoreHistoryEntry(entry);
+    });
+  }
+
   // Back to grid button handler
   if (ccBackToGridBtn) {
     ccBackToGridBtn.addEventListener('click', () => {
@@ -3887,7 +4184,9 @@ window.addEventListener('DOMContentLoaded', () => {
       }));
       ccCurrentImageIndex = 0;
       ccCorrectionResults = {};
-      
+      ccUndoStacks = {};
+      ccRedoStacks = {};
+
       // Render the grid with new images
       renderColorLabGrid();
       
@@ -3960,13 +4259,19 @@ window.addEventListener('DOMContentLoaded', () => {
       
       await ButtonLoader.wrap(ccSaveCurrentBtn, 'Saving...', async () => {
         try {
+          let saveRegion = null;
+          if (SelectionTool && SelectionTool.active && SelectionTool.rect) {
+            const r = SelectionTool.rect;
+            saveRegion = { x: r.x, y: r.y, width: r.w, height: r.h };
+          }
           const response = await fetch('http://localhost:8081/color-correct/apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               method: ccCurrentMethod,
               parameters: ccCurrentParameters,
-              imagePath: ccCurrentImagePath
+              imagePath: ccCurrentImagePath,
+              region: saveRegion
             })
           });
           
@@ -4252,6 +4557,14 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Quick-action chip buttons
+  document.querySelectorAll('.agent-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const prompt = chip.dataset.prompt;
+      if (prompt) sendAgentMessage(prompt);
+    });
+  });
+
   // Send on Ctrl+Enter / Cmd+Enter (Enter alone = newline)
   if (agentChatInput) {
     agentChatInput.addEventListener('keydown', (e) => {
@@ -4307,7 +4620,9 @@ window.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({
           sessionId: agentSessionId,
           message:   userText,
-          imagePath: ccCurrentImagePath || null
+          imagePath: ccCurrentImagePath || null,
+          imageFeatures: ccCurrentImage?.features || null,
+          imageIssues:   ccCurrentImage?.issues   || null
         })
       });
 
@@ -4344,7 +4659,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
           if (eventName === 'token') {
             fullText += eventData;
-            assistantBubble.textContent = fullText;
+            assistantBubble.innerHTML = renderMarkdown(fullText);
             scrollChatToBottom();
           } else if (eventName === 'correction') {
             try { correctionData = JSON.parse(eventData); } catch (e) { /* ignore */ }
@@ -4406,9 +4721,21 @@ window.addEventListener('DOMContentLoaded', () => {
     // Sync method selection and sliders
     if (method && ccMethods.find(m => m.id === method)) {
       ccCurrentMethod = method;
-      ccMethodBtns.forEach(b => {
-        b.classList.toggle('active', b.dataset.method === method);
-      });
+
+      // Find the category that contains this method and activate it
+      const category = Object.entries(methodCategories)
+        .find(([, methods]) => methods.includes(method))?.[0];
+      if (category) {
+        ccCategoryBtns.forEach(b => b.classList.remove('active'));
+        ccCategoryBtns.forEach(b => {
+          if (b.dataset.category === category) b.classList.add('active');
+        });
+        ccCurrentCategory = category;
+        populateMethodDropdown(category);
+        ccMethodDropdown.value = method;
+      }
+
+      updateTheoryContent(method);
     }
 
     if (params && typeof params === 'object') {
@@ -4429,6 +4756,16 @@ window.addEventListener('DOMContentLoaded', () => {
       };
       updateSaveButtonStates();
       if (ccAskAiBtn) ccAskAiBtn.style.display = 'flex';
+
+      // Push to undo stack, clear redo stack (mirrors applyColorCorrection)
+      const path = ccCurrentImagePath;
+      if (!ccUndoStacks[path]) ccUndoStacks[path] = [];
+      if (!ccRedoStacks[path]) ccRedoStacks[path] = [];
+      ccUndoStacks[path].push({ method: ccCurrentMethod, parameters: { ...ccCurrentParameters }, base64: base64 });
+      if (ccUndoStacks[path].length > CC_UNDO_MAX) ccUndoStacks[path].shift();
+      ccRedoStacks[path] = [];
+      updateUndoRedoButtonStates();
+      drawHistogram(ccCorrectedImage);
     }
 
     // Add action buttons
@@ -4462,6 +4799,46 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
+   * Minimal Markdown → HTML renderer (no external library).
+   * Handles: code blocks, inline code, bold, italic, bullet lists, line breaks.
+   * Only used for assistant bubbles — user input is always plain text.
+   */
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text;
+
+    // Escape HTML entities first to prevent XSS from AI output
+    html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Code blocks (``` ... ```)
+    html = html.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) =>
+      `<pre><code>${code.trimEnd()}</code></pre>`);
+
+    // Inline code (`...`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Bold (**...**)
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    // Italic (*...*)
+    html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+
+    // Bullet lists: lines starting with "- "
+    html = html.replace(/((?:^|\n)- .+)+/g, match => {
+      const items = match.trim().split('\n').map(l => `<li>${l.replace(/^- /, '')}</li>`).join('');
+      return `<ul>${items}</ul>`;
+    });
+
+    // Paragraph breaks (double newline)
+    html = html.replace(/\n\n/g, '<br><br>');
+
+    // Single newlines
+    html = html.replace(/\n/g, '<br>');
+
+    return html;
+  }
+
+  /**
    * Append a chat bubble to the history and return its text node.
    * @param {'user'|'assistant'} role
    * @param {string} text
@@ -4473,7 +4850,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
     const bubble = document.createElement('div');
     bubble.className = 'agent-bubble-text';
-    bubble.textContent = text;
+    if (role === 'assistant' && text) {
+      bubble.innerHTML = renderMarkdown(text);
+    } else {
+      bubble.textContent = text;
+    }
 
     row.appendChild(bubble);
     agentChatHistory.appendChild(row);
@@ -4495,6 +4876,93 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
       agentStatusLine.style.display = 'none';
     }
+  }
+
+  // ============================
+  // Histogram
+  // ============================
+
+  function drawHistogram(imgEl) {
+    const canvas = document.getElementById('ccHistogramCanvas');
+    if (!canvas || !imgEl || !imgEl.src || imgEl.style.display === 'none') return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw to offscreen canvas to read pixels
+    const off = document.createElement('canvas');
+    off.width = imgEl.naturalWidth || imgEl.width || 256;
+    off.height = imgEl.naturalHeight || imgEl.height || 256;
+    const octx = off.getContext('2d');
+    try {
+      octx.drawImage(imgEl, 0, 0, off.width, off.height);
+    } catch (e) { return; } // tainted canvas (cross-origin) — skip
+
+    const data = octx.getImageData(0, 0, off.width, off.height).data;
+    const rBins = new Float32Array(256);
+    const gBins = new Float32Array(256);
+    const bBins = new Float32Array(256);
+    const yBins = new Float32Array(256);
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+      rBins[r]++;
+      gBins[g]++;
+      bBins[b]++;
+      yBins[lum]++;
+    }
+
+    // Log-scale normalise to canvas height
+    function logNorm(bins) {
+      const peak = Math.max(...bins, 1);
+      return Array.from(bins).map(v => v > 0 ? Math.log1p(v) / Math.log1p(peak) : 0);
+    }
+
+    const rN = logNorm(rBins), gN = logNorm(gBins), bN = logNorm(bBins), yN = logNorm(yBins);
+
+    function drawLine(norm, color, alpha = 0.5) {
+      ctx.beginPath();
+      ctx.moveTo(0, H);
+      for (let x = 0; x < 256; x++) {
+        const cx = (x / 255) * W;
+        const cy = H - norm[x] * H;
+        if (x === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      }
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+      ctx.fill();
+    }
+
+    // Background
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, W, H);
+
+    // Channels: luminance first (white), then R, G, B
+    drawLine(yN, 'rgb(200,200,200)', 0.25);
+    drawLine(rN, 'rgb(220,50,50)', 0.45);
+    drawLine(gN, 'rgb(50,200,80)', 0.45);
+    drawLine(bN, 'rgb(60,120,255)', 0.45);
+  }
+
+  // Draw histogram when the corrected or original image loads
+  if (ccCorrectedImage) {
+    ccCorrectedImage.addEventListener('load', () => {
+      if (ccCorrectedImage.style.display !== 'none') drawHistogram(ccCorrectedImage);
+    });
+  }
+  if (ccOriginalImage) {
+    ccOriginalImage.addEventListener('load', () => {
+      const canvas = document.getElementById('ccHistogramCanvas');
+      if (canvas) {
+        const hasCorrected = ccCorrectedImage && ccCorrectedImage.style.display !== 'none';
+        if (!hasCorrected) drawHistogram(ccOriginalImage);
+      }
+    });
   }
 
 }); // End of DOMContentLoaded

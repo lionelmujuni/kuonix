@@ -376,6 +376,183 @@ public class ColorCorrectionService {
     }
 
     /**
+     * Variant of {@link #processImageToBase64} that applies the correction only to a
+     * rectangular region (ROI) and composites the result back into the full image.
+     *
+     * @param region normalised region (0–1 range); null means whole image
+     */
+    public String processImageToBase64(Path imagePath, String method,
+                                       java.util.Map<String, Object> params,
+                                       app.restful.dto.RegionDto region) {
+        if (region == null) return processImageToBase64(imagePath, method, params);
+
+        if (!Files.exists(imagePath)) throw new IllegalArgumentException("Image not found: " + imagePath);
+
+        Path imageToProcess = resolveProcessablePath(imagePath);
+        Mat bgr = opencv_imgcodecs.imread(imageToProcess.toString(), opencv_imgcodecs.IMREAD_COLOR);
+        if (bgr == null || bgr.empty()) throw new IllegalArgumentException("Cannot read image: " + imageToProcess);
+
+        Mat result = applyRegionComposite(bgr, method, params, region);
+
+        try {
+            Path tempFile = Files.createTempFile("cc_roi_preview_", ".jpg");
+            opencv_imgcodecs.imwrite(tempFile.toString(), result);
+            byte[] bytes = Files.readAllBytes(tempFile);
+            Files.deleteIfExists(tempFile);
+            bgr.release();
+            result.release();
+            return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(bytes);
+        } catch (IOException e) {
+            bgr.release();
+            result.release();
+            throw new RuntimeException("Failed to encode ROI preview", e);
+        }
+    }
+
+    /**
+     * Variant of {@link #processAndSaveImage} that applies the correction only inside the ROI.
+     */
+    public Path processAndSaveImage(Path inputPath, Path outputPath, String method,
+                                    java.util.Map<String, Object> params,
+                                    app.restful.dto.RegionDto region) {
+        if (region == null) return processAndSaveImage(inputPath, outputPath, method, params);
+
+        if (!Files.exists(inputPath)) throw new IllegalArgumentException("Image not found: " + inputPath);
+
+        Path imageToProcess = resolveProcessablePath(inputPath);
+        Mat bgr = opencv_imgcodecs.imread(imageToProcess.toString(), opencv_imgcodecs.IMREAD_COLOR);
+        if (bgr == null || bgr.empty()) throw new IllegalArgumentException("Cannot read image: " + imageToProcess);
+
+        Mat result = applyRegionComposite(bgr, method, params, region);
+        opencv_imgcodecs.imwrite(outputPath.toString(), result);
+        bgr.release();
+        result.release();
+        return outputPath;
+    }
+
+    /**
+     * Applies the correction to the ROI and composites it back into a clone of {@code bgr}.
+     */
+    private Mat applyRegionComposite(Mat bgr, String method, java.util.Map<String, Object> params,
+                                     app.restful.dto.RegionDto r) {
+        // Convert normalised (0–1) coordinates to pixel coordinates
+        int x = Math.max(0, (int) Math.round(r.x() * bgr.cols()));
+        int y = Math.max(0, (int) Math.round(r.y() * bgr.rows()));
+        int w = Math.min((int) Math.round(r.width()  * bgr.cols()), bgr.cols() - x);
+        int h = Math.min((int) Math.round(r.height() * bgr.rows()), bgr.rows() - y);
+        if (w <= 0 || h <= 0) return applyCorrectionMethod(bgr, method, params); // degenerate → full
+
+        // Extract ROI sub-image
+        org.bytedeco.opencv.opencv_core.Rect rect =
+                new org.bytedeco.opencv.opencv_core.Rect(x, y, w, h);
+        Mat roi = bgr.apply(rect).clone();
+
+        // Correct only the ROI
+        Mat correctedRoi = applyCorrectionMethod(roi, method, params);
+        roi.release();
+
+        // Clone original, paste corrected ROI back
+        Mat output = bgr.clone();
+        correctedRoi.copyTo(output.apply(rect));
+        correctedRoi.release();
+        return output;
+    }
+
+    /**
+     * Resolves the actual processable path for an image, following RAW cache lookups.
+     */
+    private Path resolveProcessablePath(Path imagePath) {
+        if (rawService.isRawFile(imagePath)) {
+            Path full = rawService.getImageCache().get(imagePath, true);
+            if (full != null && Files.exists(full)) return full;
+            Path preview = rawService.getImageCache().get(imagePath, false);
+            if (preview != null && Files.exists(preview)) return preview;
+            throw new IllegalArgumentException("RAW file not yet decoded: " + imagePath);
+        }
+        return imagePath;
+    }
+
+    /**
+     * Manual white balance using colour temperature (Kelvin) and tint (green↔magenta).
+     *
+     * <p>Converts Kelvin to approximate RGB multipliers via the Planckian locus
+     * polynomial approximation (Kim et al. 2002), then applies a tint bias on the
+     * green channel. Multipliers are normalised so the brightest channel stays at 1.0.</p>
+     *
+     * @param bgr    source image in BGR format (uint8)
+     * @param tempK  colour temperature in Kelvin [2000–10000]
+     * @param tint   green/magenta bias [-1.0, +1.0]; positive = more green, negative = more magenta
+     */
+    public Mat applyTemperatureTint(Mat bgr, double tempK, double tint) {
+        // Clamp inputs
+        tempK = Math.max(1000, Math.min(20000, tempK));
+        tint  = Math.max(-1.0, Math.min(1.0, tint));
+
+        // Planckian locus approximation (temperature → chromaticity → RGB gains)
+        double t = tempK / 100.0;
+        double r, g, b;
+
+        // Red
+        if (t <= 66) {
+            r = 255;
+        } else {
+            r = 329.698727446 * Math.pow(t - 60, -0.1332047592);
+        }
+
+        // Green
+        if (t <= 66) {
+            g = 99.4708025861 * Math.log(t) - 161.1195681661;
+        } else {
+            g = 288.1221695283 * Math.pow(t - 60, -0.0755148492);
+        }
+
+        // Blue
+        if (t >= 66) {
+            b = 255;
+        } else if (t <= 19) {
+            b = 0;
+        } else {
+            b = 138.5177312231 * Math.log(t - 10) - 305.0447927307;
+        }
+
+        // Normalise to [0, 1] gains
+        double rGain = Math.max(0.01, Math.min(255, r)) / 255.0;
+        double gGain = Math.max(0.01, Math.min(255, g)) / 255.0;
+        double bGain = Math.max(0.01, Math.min(255, b)) / 255.0;
+
+        // Apply tint: shift green channel; compensate red/blue to maintain luminance balance
+        double tintShift = tint * 0.25;
+        gGain = Math.max(0.01, gGain + tintShift);
+        rGain = Math.max(0.01, rGain - tintShift * 0.5);
+        bGain = Math.max(0.01, bGain - tintShift * 0.5);
+
+        // Normalise so max gain = 1.0 (avoid clipping)
+        double maxGain = Math.max(rGain, Math.max(gGain, bGain));
+        rGain /= maxGain;
+        gGain /= maxGain;
+        bGain /= maxGain;
+
+        // Apply per-channel gains (BGR order in OpenCV)
+        MatVector channels = new MatVector(3);
+        opencv_core.split(bgr, channels);
+
+        Mat bCh = new Mat(), gCh = new Mat(), rCh = new Mat();
+        channels.get(0).convertTo(bCh, -1, bGain, 0);
+        channels.get(1).convertTo(gCh, -1, gGain, 0);
+        channels.get(2).convertTo(rCh, -1, rGain, 0);
+
+        Mat result = new Mat();
+        MatVector merged = new MatVector(bCh, gCh, rCh);
+        opencv_core.merge(merged, result);
+
+        channels.close();
+        bCh.release(); gCh.release(); rCh.release();
+        merged.close();
+
+        return result;
+    }
+
+    /**
      * Apply correction method based on method name and parameters.
      */
     private Mat applyCorrectionMethod(Mat bgr, String method, java.util.Map<String, Object> params) {
@@ -403,6 +580,12 @@ public class ColorCorrectionService {
             case "saturation":
                 double factor = getDoubleParam(params, "factor", 1.2);
                 result = enhanceSaturation(bgr, factor);
+                break;
+
+            case "temperature_tint":
+                double tempK = getDoubleParam(params, "tempK", 5500.0);
+                double tint  = getDoubleParam(params, "tint", 0.0);
+                result = applyTemperatureTint(bgr, tempK, tint);
                 break;
 
             case "color_matrix":
