@@ -23,6 +23,8 @@ jobs:
       # Cache Gradle dependencies
       - name: Setup Gradle (with caching)
         uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: false
 
       - name: Display Gradle and Java versions
         run: |
