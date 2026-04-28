@@ -33,14 +33,13 @@ jobs:
 
       - name: Run tests
         working-directory: restful   
-        run: bash ./gradlew test
+        run: gradle test
 
   # ----- Generate Doxygen Docs  -----
   generate-doxygen-docs:
     name: Generate Doxygen Docs
     runs-on: ubuntu-latest
-
-    # Same lightweight Debian image used in Bitbucket
+    
     container:
       image: debian:bullseye-slim
 
