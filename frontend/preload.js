@@ -32,5 +32,6 @@ contextBridge.exposeInMainWorld('help', {
 // Expose folder dialog API
 contextBridge.exposeInMainWorld('dialog', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
-  openFolder: (path) => ipcRenderer.invoke('open-folder', path)
+  openFolder: (path) => ipcRenderer.invoke('open-folder', path),
+  selectReferenceImage: () => ipcRenderer.invoke('select-reference-image')
 });

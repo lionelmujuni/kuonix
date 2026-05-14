@@ -27,6 +27,11 @@ public class ClassifierThresholds {
     private double skinLineDeg;
     private double skinLineTolDeg;
     private double skinOverSatMin;
+    private double hazeDarkChannelMin;
+    private double crushedShadowsBlackTailMinPct;
+    private double crushedShadowsMedianMin;
+    private double clippedHighlightsWhiteTailMinPct;
+    private double clippedHighlightsMedianMax;
 
     // Getters
     public double getUnderexpMedianMax() { return underexpMedianMax; }
@@ -50,6 +55,11 @@ public class ClassifierThresholds {
     public double getSkinLineDeg() { return skinLineDeg; }
     public double getSkinLineTolDeg() { return skinLineTolDeg; }
     public double getSkinOverSatMin() { return skinOverSatMin; }
+    public double getHazeDarkChannelMin() { return hazeDarkChannelMin; }
+    public double getCrushedShadowsBlackTailMinPct() { return crushedShadowsBlackTailMinPct; }
+    public double getCrushedShadowsMedianMin() { return crushedShadowsMedianMin; }
+    public double getClippedHighlightsWhiteTailMinPct() { return clippedHighlightsWhiteTailMinPct; }
+    public double getClippedHighlightsMedianMax() { return clippedHighlightsMedianMax; }
 
     // Setters (required for @ConfigurationProperties binding)
     public void setUnderexpMedianMax(double value) { this.underexpMedianMax = value; }
@@ -73,4 +83,9 @@ public class ClassifierThresholds {
     public void setSkinLineDeg(double value) { this.skinLineDeg = value; }
     public void setSkinLineTolDeg(double value) { this.skinLineTolDeg = value; }
     public void setSkinOverSatMin(double value) { this.skinOverSatMin = value; }
+    public void setHazeDarkChannelMin(double value) { this.hazeDarkChannelMin = value; }
+    public void setCrushedShadowsBlackTailMinPct(double value) { this.crushedShadowsBlackTailMinPct = value; }
+    public void setCrushedShadowsMedianMin(double value) { this.crushedShadowsMedianMin = value; }
+    public void setClippedHighlightsWhiteTailMinPct(double value) { this.clippedHighlightsWhiteTailMinPct = value; }
+    public void setClippedHighlightsMedianMax(double value) { this.clippedHighlightsMedianMax = value; }
 }

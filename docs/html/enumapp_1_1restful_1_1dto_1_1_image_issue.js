@@ -1,0 +1,26 @@
+var enumapp_1_1restful_1_1dto_1_1_image_issue =
+[
+    [ "ColorCast_Blue", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#af923749a40c1485712942fcbfcbc04d6", null ],
+    [ "ColorCast_Cyan", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a9cb354779dfa4fe77d4cfb319d03bc34", null ],
+    [ "ColorCast_Green", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#ab96c12e3cfdd9add8dfc8d845ba3ee3a", null ],
+    [ "ColorCast_Magenta", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a968ed0064851d4dbb8679baa4b596e69", null ],
+    [ "ColorCast_Red", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a345cf8f4da91c893c2fa41317cd30045", null ],
+    [ "ColorCast_Yellow", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#aacaaa2f3b3f5348cdf70f0cca6cb9ebd", null ],
+    [ "Needs_Contrast_Decrease", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a4e3ca87cb4e673aab1045ddbaf1f29db", null ],
+    [ "Needs_Contrast_Increase", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#ac3a2897d04bc1ec7cd2e8123fb7d16f2", null ],
+    [ "Needs_Exposure_Decrease", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#aba3a4fba6ddde8a543a695ef2ca733a5", null ],
+    [ "Needs_Exposure_Increase", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#afe6b09341c969fdecb67a5290c0397e6", null ],
+    [ "Needs_Noise_Reduction", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a3dcb116f0a19da81f7b80810ce293b5d", null ],
+    [ "Needs_Saturation_Increase", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a2f4b804b03f9159d1b510822ff9102b0", null ],
+    [ "Oversaturated_Blue", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a0a69d71ed13d1fcd6d3e1df7fac90964", null ],
+    [ "Oversaturated_Cyan", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#addeb0879521dc7c6371aca19f6c3fead", null ],
+    [ "Oversaturated_Global", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a7ab2ecfe1bdd21ffc884707f62d78c01", null ],
+    [ "Oversaturated_Green", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a31e1da9c894ef2649e59b0eb94c2ee66", null ],
+    [ "Oversaturated_Magenta", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#abe7b28c3b13092d32f64da8bca7895c3", null ],
+    [ "Oversaturated_Red", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#af51f98541a6681f1249575a3465c5e44", null ],
+    [ "Oversaturated_Yellow", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a6c1be4d315e0dab709b5884f392a2ea3", null ],
+    [ "SkinTone_Too_Desaturated", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a9c557e0e0a9a3463e0abac952e0316e8", null ],
+    [ "SkinTone_Too_Green", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#a1422ea12db01b25980a2ef5ac0fab8f2", null ],
+    [ "SkinTone_Too_Magenta", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#ab8274a22a94b642171cbb2d92a18f525", null ],
+    [ "SkinTone_Too_OrangeRed", "enumapp_1_1restful_1_1dto_1_1_image_issue.html#ad473320d1f4a57f303dfb576b8b8dd38", null ]
+];

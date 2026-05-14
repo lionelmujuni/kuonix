@@ -58,11 +58,17 @@ public class DynamicOllamaConfig {
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + settings.apiKey());
 
+        // Thinking models consume their entire token budget on reasoning before
+        // emitting a single visible token. Enforce a minimum of 8192 so there is
+        // always room for the actual reply after the chain-of-thought phase.
+        int effectiveMaxTokens = (settings.maxTokens() == null || settings.maxTokens() < 8192)
+                ? 8192 : settings.maxTokens();
+
         return OllamaStreamingChatModel.builder()
                 .baseUrl(settings.baseUrl())
                 .modelName(settings.modelName())
                 .temperature(settings.temperature())
-                .numPredict(settings.maxTokens())
+                .numPredict(effectiveMaxTokens)
                 .timeout(Duration.ofSeconds(120))
                 .customHeaders(headers)
                 .logRequests(true)

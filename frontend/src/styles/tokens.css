@@ -1,0 +1,201 @@
+/* Kuonix design tokens — single source of truth.
+   Per the kuonix-design-system skill. Never hardcode colors in components. */
+
+:root {
+  /* Color primitives */
+  --color-cream-50: #fcfcf9;
+  --color-cream-100: #f5f4ed;
+  --color-gray-200: #e8e7e3;
+  --color-gray-300: #d4d3cd;
+  --color-gray-400: #b3b2ab;
+  --color-slate-500: #6b6c6c;
+  --color-slate-900: #2a2c2c;
+  --color-charcoal-700: #1f2121;
+  --color-charcoal-800: #262828;
+  --color-charcoal-900: #161818;
+
+  --color-teal-300: #5fb3b3;
+  --color-teal-400: #3fa3a3;
+  --color-teal-500: #21808d;
+  --color-teal-600: #1a6b76;
+  --color-teal-700: #155962;
+  --color-teal-800: #114851;
+  --color-teal-500-rgb: 33, 128, 141;
+
+  --color-brown-600: #5e5240;
+  --color-brown-600-rgb: 94, 82, 64;
+
+  --color-red-400: #ef6a5b;
+  --color-red-500: #e35747;
+  --color-red-500-rgb: 227, 87, 71;
+
+  --color-orange-400: #f0a049;
+  --color-orange-500: #e88c2e;
+  --color-orange-500-rgb: 232, 140, 46;
+
+  --color-amber-500: #d4a72c;
+  --color-green-500: #4caf50;
+  --color-green-500-rgb: 76, 175, 80;
+  --color-blue-500: #3b82f6;
+  --color-blue-500-rgb: 59, 130, 246;
+  --color-purple-500: #8b5cf6;
+  --color-pink-500: #ec4899;
+  --color-cyan-500: #06b6d4;
+  --color-grey-400: #777c7c;
+  --color-grey-400-rgb: 119, 124, 124;
+
+  /* Semantic — light mode default */
+  --color-background: var(--color-cream-50);
+  --color-surface: #ffffff;
+  --color-text: var(--color-slate-900);
+  --color-text-rgb: 42, 44, 44;
+  --color-text-secondary: var(--color-slate-500);
+
+  --color-primary: var(--color-teal-500);
+  --color-primary-hover: var(--color-teal-600);
+  --color-primary-active: var(--color-teal-700);
+
+  --color-secondary: rgba(94, 82, 64, 0.06);
+  --color-secondary-hover: rgba(94, 82, 64, 0.1);
+  --color-secondary-active: rgba(94, 82, 64, 0.16);
+
+  --color-border: rgba(94, 82, 64, 0.14);
+  --color-card-border: rgba(94, 82, 64, 0.12);
+  --color-card-border-inner: rgba(94, 82, 64, 0.08);
+
+  --color-success: var(--color-green-500); --color-success-rgb: var(--color-green-500-rgb);
+  --color-error:   var(--color-red-500);   --color-error-rgb:   var(--color-red-500-rgb);
+  --color-warning: var(--color-orange-500); --color-warning-rgb: var(--color-orange-500-rgb);
+  --color-info:    var(--color-blue-500);  --color-info-rgb:    var(--color-blue-500-rgb);
+
+  --color-focus-ring: rgba(var(--accent-color-rgb), 0.45);
+  --focus-ring: 0 0 0 3px rgba(var(--accent-color-rgb), 0.18);
+  --focus-outline: 2px solid rgba(var(--accent-color-rgb), 0.55);
+
+  /* Accent — user-customizable (default: blue in light, grey in dark).
+     Every interactive state must reach for these. */
+  --accent-color: rgba(59, 130, 246, 1);
+  --accent-color-rgb: 59, 130, 246;
+  --accent-subtle: rgba(var(--accent-color-rgb), 0.08);
+  --accent-border: rgba(var(--accent-color-rgb), 0.2);
+  --accent-shadow: rgba(var(--accent-color-rgb), 0.15);
+  --fullscreen-bg: rgba(var(--accent-color-rgb), 0.04);
+
+  /* Category slots for image grouping */
+  --color-bg-1: rgba(var(--color-blue-500-rgb), 0.08);
+  --color-bg-2: rgba(212, 167, 44, 0.08);
+  --color-bg-3: rgba(var(--color-green-500-rgb), 0.08);
+  --color-bg-4: rgba(var(--color-red-500-rgb), 0.08);
+  --color-bg-5: rgba(139, 92, 246, 0.08);
+  --color-bg-6: rgba(var(--color-orange-500-rgb), 0.08);
+  --color-bg-7: rgba(236, 72, 153, 0.08);
+  --color-bg-8: rgba(6, 182, 212, 0.08);
+
+  /* Typography */
+  --font-family-base: "FKGroteskNeue", "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: "Berkeley Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+  --font-size-4xl: 30px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+  --font-weight-bold: 600;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-eyebrow: 2.5px;
+
+  /* Spacing */
+  --space-0: 0;   --space-1: 1px;  --space-2: 2px;  --space-4: 4px;
+  --space-6: 6px; --space-8: 8px;  --space-10: 10px; --space-12: 12px;
+  --space-16: 16px; --space-20: 20px; --space-24: 24px; --space-32: 32px;
+  --space-40: 40px; --space-48: 48px;
+
+  /* Radii */
+  --radius-sm: 6px; --radius-base: 8px; --radius-md: 10px;
+  --radius-lg: 12px; --radius-xl: 16px; --radius-full: 9999px;
+
+  /* Shadows — warm in light mode */
+  --shadow-xs: 0 1px 2px rgba(94, 82, 64, 0.08);
+  --shadow-sm: 0 1px 3px rgba(94, 82, 64, 0.08), 0 1px 2px rgba(94, 82, 64, 0.06);
+  --shadow-md: 0 4px 6px rgba(94, 82, 64, 0.08), 0 2px 4px rgba(94, 82, 64, 0.06);
+  --shadow-lg: 0 10px 15px rgba(94, 82, 64, 0.08), 0 4px 6px rgba(94, 82, 64, 0.04);
+  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(94, 82, 64, 0.04);
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Layout */
+  --titlebar-height: 44px;
+  --left-nav-width: 268px;
+  --left-nav-collapsed: 72px;
+  --agent-rail-height: 320px;
+  --agent-rail-collapsed: 56px;
+}
+
+/* Dark mode — system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--color-charcoal-700);
+    --color-surface: var(--color-charcoal-800);
+    --color-text: #ececea;
+    --color-text-rgb: 236, 236, 234;
+    --color-text-secondary: #9ea2a2;
+
+    --color-secondary: rgba(255, 255, 255, 0.04);
+    --color-secondary-hover: rgba(255, 255, 255, 0.07);
+    --color-secondary-active: rgba(255, 255, 255, 0.1);
+
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-card-border: rgba(255, 255, 255, 0.08);
+    --color-card-border-inner: rgba(255, 255, 255, 0.05);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.45), 0 4px 6px rgba(0, 0, 0, 0.25);
+    --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+
+    --accent-color: rgba(119, 124, 124, 1);
+    --accent-color-rgb: 119, 124, 124;
+  }
+}
+
+/* Manual overrides — must always cover BOTH @media and [data-color-scheme] */
+[data-color-scheme="dark"] {
+  --color-background: var(--color-charcoal-700);
+  --color-surface: var(--color-charcoal-800);
+  --color-text: #ececea;
+  --color-text-rgb: 236, 236, 234;
+  --color-text-secondary: #9ea2a2;
+
+  --color-secondary: rgba(255, 255, 255, 0.04);
+  --color-secondary-hover: rgba(255, 255, 255, 0.07);
+  --color-secondary-active: rgba(255, 255, 255, 0.1);
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-card-border: rgba(255, 255, 255, 0.08);
+  --color-card-border-inner: rgba(255, 255, 255, 0.05);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.35), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.45), 0 4px 6px rgba(0, 0, 0, 0.25);
+  --shadow-inset-sm: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+[data-color-scheme="light"] {
+  --color-background: var(--color-cream-50);
+  --color-surface: #ffffff;
+  --color-text: var(--color-slate-900);
+  --color-text-rgb: 42, 44, 44;
+  --color-text-secondary: var(--color-slate-500);
+}

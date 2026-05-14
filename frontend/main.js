@@ -83,7 +83,7 @@ function createWindow () {
     show: false
   });
 
-  win.loadFile('index.html');
+  win.loadFile('index-next.html');
 
   // Show window when ready to prevent visual flash
   win.once('ready-to-show', () => {
@@ -302,7 +302,7 @@ function getAdminSearchCommand(filename) {
 
 app.whenReady().then(() => {
   createWindow();
-  startBackend();
+  if (!process.env.KUONIX_BACKEND_DISABLED) startBackend();
   protocol.registerFileProtocol('img', (request, callback) => {
     const filePath = url.fileURLToPath('file://' + request.url.slice('atom://'.length))
     callback(filePath)

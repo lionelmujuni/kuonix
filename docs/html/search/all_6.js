@@ -1,0 +1,25 @@
+var searchData=
+[
+  ['imageanalysiscontroller_0',['ImageAnalysisController',['../classapp_1_1restful_1_1api_1_1_image_analysis_controller.html',1,'app.restful.api.ImageAnalysisController'],['../classapp_1_1restful_1_1api_1_1_image_analysis_controller.html#ab165307178fe0647fa4ec320909af041',1,'app.restful.api.ImageAnalysisController.ImageAnalysisController()']]],
+  ['imageanalysiscontroller_2ejava_1',['ImageAnalysisController.java',['../_image_analysis_controller_8java.html',1,'']]],
+  ['imageanalysisservice_2',['ImageAnalysisService',['../classapp_1_1restful_1_1services_1_1_image_analysis_service.html',1,'app.restful.services.ImageAnalysisService'],['../classapp_1_1restful_1_1services_1_1_image_analysis_service.html#a47460b0398878c33cdd86831e30cda09',1,'app.restful.services.ImageAnalysisService.ImageAnalysisService()']]],
+  ['imageanalysisservice_2ejava_3',['ImageAnalysisService.java',['../_image_analysis_service_8java.html',1,'']]],
+  ['imageclassifierservice_4',['ImageClassifierService',['../classapp_1_1restful_1_1services_1_1_image_classifier_service.html',1,'app.restful.services.ImageClassifierService'],['../classapp_1_1restful_1_1services_1_1_image_classifier_service.html#ac137b40c635c1966a90e25f55e93b2b8',1,'app.restful.services.ImageClassifierService.ImageClassifierService()']]],
+  ['imageclassifierservice_2ejava_5',['ImageClassifierService.java',['../_image_classifier_service_8java.html',1,'']]],
+  ['imageclassifyrequest_6',['ImageClassifyRequest',['../namespaceapp_1_1restful_1_1dto.html#a91d2db4662edaf0516f9992d7d4882d0',1,'app::restful::dto']]],
+  ['imageclassifyrequest_2ejava_7',['ImageClassifyRequest.java',['../_image_classify_request_8java.html',1,'']]],
+  ['imageclassifyresult_8',['ImageClassifyResult',['../namespaceapp_1_1restful_1_1dto.html#a7db537567e15672833f17f9573fe5a8b',1,'app::restful::dto']]],
+  ['imageclassifyresult_2ejava_9',['ImageClassifyResult.java',['../_image_classify_result_8java.html',1,'']]],
+  ['imagefeatures_10',['ImageFeatures',['../namespaceapp_1_1restful_1_1dto.html#a4f760b96a6211e32afbbc74addd20f70',1,'app::restful::dto']]],
+  ['imagefeatures_2ejava_11',['ImageFeatures.java',['../_image_features_8java.html',1,'']]],
+  ['imageissue_12',['ImageIssue',['../enumapp_1_1restful_1_1dto_1_1_image_issue.html',1,'app::restful::dto']]],
+  ['imageissue_2ejava_13',['ImageIssue.java',['../_image_issue_8java.html',1,'']]],
+  ['imageurldata_14',['ImageUrlData',['../namespaceapp_1_1restful_1_1dto.html#a3bd67b3b7b8ed6de76ecdbd0725e4a5f',1,'app::restful::dto']]],
+  ['imageurldata_2ejava_15',['ImageUrlData.java',['../_image_url_data_8java.html',1,'']]],
+  ['imageurlrequest_16',['ImageUrlRequest',['../namespaceapp_1_1restful_1_1dto.html#aff4fb7bb6e936cb77a3bc22fcbe88efb',1,'app::restful::dto']]],
+  ['imageurlrequest_2ejava_17',['ImageUrlRequest.java',['../_image_url_request_8java.html',1,'']]],
+  ['imageurlresponse_18',['ImageUrlResponse',['../namespaceapp_1_1restful_1_1dto.html#a0f7beee92976b429098e5434b63cdd28',1,'app::restful::dto']]],
+  ['imageurlresponse_2ejava_19',['ImageUrlResponse.java',['../_image_url_response_8java.html',1,'']]],
+  ['ispreviewimage_20',['isPreviewImage',['../classapp_1_1restful_1_1services_1_1_raw_processing_service.html#af267159d25f7289a33f0883b04a01a89',1,'app::restful::services::RawProcessingService']]],
+  ['israwfile_21',['isRawFile',['../classapp_1_1restful_1_1services_1_1_raw_processing_service.html#aa8a8d652dd295545942f88b8de248d74',1,'app::restful::services::RawProcessingService']]]
+];

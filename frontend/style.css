@@ -2675,6 +2675,62 @@ select.form-control{
   gap: var(--space-12);
 }
 
+/* Color Matrix Transform grid widget */
+.cc-matrix-grid {
+  display: grid;
+  grid-template-columns: auto repeat(3, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  margin: 12px 0;
+}
+.cc-matrix-grid .cc-matrix-header,
+.cc-matrix-grid .cc-matrix-row-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  font-weight: 600;
+}
+.cc-matrix-grid .cc-matrix-row-label {
+  text-align: right;
+  padding-right: 4px;
+}
+.cc-matrix-grid .cc-matrix-cell { display: flex; }
+.cc-matrix-grid input[type="number"] {
+  width: 100%;
+  padding: 4px 6px;
+  font-size: 13px;
+  text-align: right;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  color: var(--color-text);
+  font-family: var(--font-family-mono, monospace);
+}
+.cc-matrix-grid .cc-matrix-cell-diag input {
+  background: var(--color-secondary);
+  border-color: var(--accent-color, var(--color-primary));
+}
+.cc-matrix-grid .cc-matrix-row-sum {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding-left: 6px;
+  min-width: 62px;
+  white-space: nowrap;
+}
+.cc-matrix-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cc-matrix-advanced { margin-top: 16px; }
+.cc-matrix-advanced summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 4px 0;
+}
+.cc-matrix-advanced summary:hover { color: var(--color-text); }
+
 /* Custom slider styling */
 .cc-slider {
   -webkit-appearance: none;
@@ -3378,13 +3434,23 @@ details[open] .cc-theory-header i.cc-chevron {
   font-size: var(--font-size-sm);
 }
 
-/* AI preview image in chat bubble */
-.agent-preview-img {
-  max-width: 100%;
-  border-radius: var(--radius-md);
+/* AI commit confirmation note in chat */
+.agent-commit-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
   margin-top: var(--space-8);
-  border: 1px solid rgba(var(--accent-color-rgb), 0.15);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-success, #2a9d8f);
+  background: rgba(42, 157, 143, 0.1);
+  border: 1px solid rgba(42, 157, 143, 0.25);
+}
+
+.agent-commit-note i {
+  font-size: 12px;
 }
 
 /* AI action buttons in chat */

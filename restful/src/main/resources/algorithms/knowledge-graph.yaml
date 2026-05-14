@@ -1,0 +1,841 @@
+---
+# Kuonix algorithm knowledge graph.
+#
+# PURPOSE — This file is the single source of truth for:
+#   1. What correction algorithms Kuonix exposes.
+#   2. What each algorithm is good for, what it struggles with, and sensible
+#      parameter defaults.
+#   3. How detected ImageIssue values map to recommended algorithms.
+#   4. Multi-step workflows for common photographic scenarios.
+#
+# WHY IT IS YAML AND NOT JAVA — This file is loaded at startup by
+# AlgorithmKnowledgeGraph (see Phase 3 plan). It powers the agent's
+# `recommendCorrections` / `describeAlgorithm` tools. Keeping it external lets
+# photographic designers tune recommendations and hints without a Java rebuild,
+# and keeps the agent's tool schema compact (the agent queries this file at
+# inference time rather than carrying the knowledge in its prompt).
+#
+# STARTUP VALIDATION — AlgorithmKnowledgeGraph enforces at boot:
+#   * Every `algorithms.<id>` appears as a `@Component` CorrectionAlgorithm.
+#   * Every `issue_to_algorithms.<ImageIssue>.primary` exists in `algorithms`.
+#   * Every `workflows.<w>.steps[*]` exists in `algorithms`.
+#   * Every ImageIssue enum value has at least one mapping (enum parity check).
+# A violation fails the Spring context — a broken graph never reaches prod.
+
+version: 1
+
+
+# =============================================================================
+# algorithms — one entry per concrete CorrectionAlgorithm implementation.
+#
+# id          stable string; matches CorrectionAlgorithm.id() and the REST
+#             `method` field. Never rename without a migration.
+# family      one of: white_balance | tone | contrast | saturation | denoise |
+#                     low_light | hdr | dehaze | skin | transfer | creative |
+#                     auto
+# cost        rough runtime class: low (<50 ms) | medium (50–500 ms) | high (>500 ms)
+#             Used to order recommendations when quality is comparable.
+# description short line the agent uses to explain the algorithm to the user.
+# region_aware whether it is safe to apply to an ROI only (most are; a few
+#              statistical methods need whole-image stats and behave oddly in ROI).
+# good_for    ImageIssue values this algorithm is designed to fix. The
+#             recommender scores candidates primarily by membership here.
+# bad_for     ImageIssue values this algorithm makes worse. Recommender drops
+#             a candidate when any bad_for matches the detected issues.
+# combines_well_with  algorithm ids that chain cleanly after this one. Used by
+#             the workflow suggester and by the agent when proposing a next step.
+# params      map of parameter name to spec:
+#               default   scalar default value
+#               range     [min, max] for numeric params (omit for paths/strings)
+#               type      double | int | string | path  (default: double)
+#               description  human-readable parameter meaning
+# =============================================================================
+
+algorithms:
+
+  # --- Existing (Phase 0 — already shipped) -----------------------------------
+
+  gray_world:
+    family: white_balance
+    cost: low
+    description: >-
+      Scales R/G/B so the average scene colour is achromatic — the simplest
+      statistical white balance. Best for scenes with diverse, balanced
+      colours and no dominant hue (street, mixed landscape, group shots).
+      Avoid on grass fields, sunsets or monochromatic rooms — it will
+      neutralise intentional colour. Pair with vibrance or clahe_lab after.
+    region_aware: true
+    good_for: [ColorCast_Red, ColorCast_Green, ColorCast_Blue,
+               ColorCast_Cyan, ColorCast_Magenta, ColorCast_Yellow]
+    bad_for: []
+    combines_well_with: [exposure, vibrance, clahe_lab]
+    params: {}
+
+  white_patch:
+    family: white_balance
+    cost: low
+    description: >-
+      Scales channels so the brightest patch becomes white. Best for scenes
+      with a reliable specular highlight or true-white reference (snow,
+      weddings, product on white, studio strobe). Misfires when highlights
+      are clipped or when a saturated object is mistaken for white — skip
+      on sunset, neon and food-on-coloured-plate shots.
+    region_aware: true
+    good_for: [ColorCast_Red, ColorCast_Green, ColorCast_Blue,
+               ColorCast_Cyan, ColorCast_Magenta, ColorCast_Yellow]
+    bad_for: [Oversaturated_Global]
+    combines_well_with: [exposure, vibrance]
+    params: {}
+
+  shades_of_gray:
+    family: white_balance
+    cost: low
+    description: >-
+      Minkowski-p generalisation of Gray World — outperforms both Gray World
+      and White Patch on the SFU/Gehler benchmark sets. The safest
+      statistical default when the scene type is unknown. p=6 is the
+      Finlayson sweet spot. Reach for this when in doubt about WB.
+    region_aware: true
+    good_for: [ColorCast_Red, ColorCast_Green, ColorCast_Blue,
+               ColorCast_Cyan, ColorCast_Magenta, ColorCast_Yellow]
+    bad_for: []
+    combines_well_with: [exposure, vibrance, clahe_lab]
+    params:
+      p:
+        default: 6.0
+        range: [1.0, 12.0]
+        description: Minkowski p-norm power.
+
+  temperature_tint:
+    family: white_balance
+    cost: low
+    description: >-
+      Manual Kelvin + green/magenta tint — the familiar Lightroom/ACR
+      sliders. Best for mixed lighting (tungsten + window), known
+      illuminants, and portraits where statistical methods would push skin
+      green. Pair with memory_color_skin in portraits. Use when the user
+      wants a deliberate warm or cool feel — not for full neutralisation.
+    region_aware: true
+    good_for: [ColorCast_Yellow, ColorCast_Blue,
+               ColorCast_Green, ColorCast_Magenta,
+               SkinTone_Too_Green, SkinTone_Too_Magenta]
+    bad_for: []
+    combines_well_with: [vibrance, exposure]
+    params:
+      tempK:
+        default: 5500.0
+        range: [2000.0, 10000.0]
+        description: Kelvin. 2000–3500 warm/candle; 5000–6500 daylight; 7000+ shade.
+      tint:
+        default: 0.0
+        range: [-1.0, 1.0]
+        description: Green/magenta bias. Positive = more green, negative = more magenta.
+
+  exposure:
+    family: tone
+    cost: low
+    description: >-
+      Uniform per-channel gain — predictable, cheap, but cannot recover
+      clipped highlights or lift true-black shadows. Use AFTER
+      highlight_recovery if the image is overexposed; clipped channels
+      won't come back from a gain stretch, only stretch into grey. For
+      strongly underexposed scenes prefer msrcr_retinex.
+    region_aware: true
+    good_for: [Needs_Exposure_Increase, Needs_Exposure_Decrease]
+    bad_for: []
+    combines_well_with: [gray_world, vibrance, clahe_lab]
+    params:
+      gain:
+        default: 1.0
+        range: [0.1, 3.0]
+        description: Brightness multiplier. 1.0 = no change, 2.0 = +1 EV.
+
+  saturation:
+    family: saturation
+    cost: low
+    description: >-
+      Linear HSV saturation scaling. Kept for graphic / product work and for
+      desaturating. AVOID on portraits — it pushes skin orange. AVOID on
+      foliage and sunsets — it clips already-saturated regions. For people
+      and nature, reach for vibrance instead.
+    region_aware: true
+    good_for: [Needs_Saturation_Increase]
+    bad_for: [Oversaturated_Global, SkinTone_Too_OrangeRed]
+    combines_well_with: [gray_world, exposure]
+    params:
+      factor:
+        default: 1.2
+        range: [0.0, 2.0]
+        description: Saturation multiplier. 1.0 = no change.
+
+  color_matrix:
+    family: white_balance
+    cost: low
+    description: >-
+      3×3 linear transform — typically a camera-native → sRGB calibration
+      matrix. Power-user tool. Reach for a camera preset from
+      /color-correct/camera-matrices first; hand-tuning all 9 values is
+      rarely worth the effort vs gray_world or temperature_tint.
+    region_aware: true
+    good_for: []
+    bad_for: []
+    combines_well_with: [gray_world, temperature_tint]
+    params:
+      m0: { default: 1.0, range: [-2.0, 2.0], description: Row 0 Col 0 }
+      m1: { default: 0.0, range: [-2.0, 2.0], description: Row 0 Col 1 }
+      m2: { default: 0.0, range: [-2.0, 2.0], description: Row 0 Col 2 }
+      m3: { default: 0.0, range: [-2.0, 2.0], description: Row 1 Col 0 }
+      m4: { default: 1.0, range: [-2.0, 2.0], description: Row 1 Col 1 }
+      m5: { default: 0.0, range: [-2.0, 2.0], description: Row 1 Col 2 }
+      m6: { default: 0.0, range: [-2.0, 2.0], description: Row 2 Col 0 }
+      m7: { default: 0.0, range: [-2.0, 2.0], description: Row 2 Col 1 }
+      m8: { default: 1.0, range: [-2.0, 2.0], description: Row 2 Col 2 }
+
+  color_distribution_alignment:
+    family: transfer
+    cost: medium
+    description: >-
+      Matches source LAB statistics (per-channel mean, std) to a chosen
+      reference image — the right tool for batch consistency (multi-camera
+      shoot, edited series) and "make this look like that" requests.
+      Strength below 1.0 blends. Skip when content differs wildly between
+      source and reference; statistical transfer needs broadly similar scenes.
+    region_aware: false
+    good_for: []
+    bad_for: []
+    combines_well_with: [clahe_lab, vibrance]
+    params:
+      referenceImagePath:
+        type: path
+        description: Absolute path to the reference image whose look will be matched.
+      strength:
+        default: 1.0
+        range: [0.0, 1.0]
+        description: Blend factor. 1.0 = full correction, 0.0 = no change.
+
+
+  # --- Phase 1 — novel algorithms, one per ImageIssue gap --------------------
+
+  msrcr_retinex:
+    family: low_light
+    cost: medium
+    description: >-
+      Multi-Scale Retinex with Colour Restoration — spatially-varying
+      illumination lift that recovers shadow detail without crushing the
+      rest of the frame. Use for underexposed scenes with mixed dynamic
+      range; strongly preferred over a flat exposure gain when the shadows
+      hide texture you want back. Concert and indoor low-light shots
+      benefit most.
+    region_aware: true
+    good_for: [Needs_Exposure_Increase, ColorCast_Yellow, ColorCast_Blue]
+    bad_for: [Needs_Exposure_Decrease, Oversaturated_Global]
+    combines_well_with: [bm3d, vibrance, clahe_lab]
+    params:
+      strength:
+        default: 0.7
+        range: [0.0, 1.0]
+        description: Overall lift amount. Higher for very dark images.
+      sigmas:
+        type: string
+        default: "15,80,250"
+        description: Comma-separated Gaussian kernel sizes (multi-scale).
+      colorRestoration:
+        default: 1.2
+        range: [0.5, 2.0]
+        description: Saturation recovery after illumination lift.
+
+  highlight_recovery:
+    family: hdr
+    cost: medium
+    description: >-
+      Single-image highlight reconstruction via Mertens fusion of
+      synthesised virtual exposures. Brings detail back into blown skies
+      and bright skin without darkening the rest of the frame. ALWAYS run
+      before any global exposure lift — clipped channels can't be stretched
+      back into detail, only into grey. Critical for backlit subjects and
+      midday landscapes.
+    region_aware: true
+    good_for: [Needs_Exposure_Decrease]
+    bad_for: [Needs_Exposure_Increase]
+    combines_well_with: [vibrance, clahe_lab]
+    params:
+      evOffsets:
+        type: string
+        default: "-1,-2"
+        description: Comma-separated EV offsets for virtual exposures.
+      strength:
+        default: 1.0
+        range: [0.0, 1.0]
+        description: Blend between original and fused result.
+
+  clahe_lab:
+    family: contrast
+    cost: low
+    description: >-
+      Contrast-Limited Adaptive Histogram Equalization on the L* channel —
+      boosts local contrast without colour drift. The default contrast tool
+      for flat-looking landscapes, overcast scenes, and any image that reads
+      "muddy". Higher clipLimit amplifies noise; cap at 2.0 unless the
+      image is already clean. Run AFTER any noise reduction.
+    region_aware: true
+    good_for: [Needs_Contrast_Increase]
+    bad_for: [Needs_Noise_Reduction, Needs_Contrast_Decrease]
+    combines_well_with: [bm3d, vibrance, msrcr_retinex]
+    params:
+      clipLimit:
+        default: 2.0
+        range: [1.0, 8.0]
+        description: Histogram clip limit. Higher = more contrast, more noise.
+      tileGrid:
+        type: int
+        default: 8
+        range: [4, 16]
+        description: Tile grid size (NxN). Smaller = more local, more artefacts.
+
+  local_laplacian:
+    family: tone
+    cost: high
+    description: >-
+      Edge-aware tone compression via Laplacian-pyramid remapping. Squeezes
+      blown highlights and crushed shadows while preserving mid-tone
+      microcontrast — the high-DR counterpart of CLAHE. Use for harsh
+      sunlight, silhouette recovery, and any scene where the histogram is
+      pushed against both walls.
+    region_aware: true
+    good_for: [Needs_Contrast_Decrease]
+    bad_for: [Needs_Contrast_Increase]
+    combines_well_with: [vibrance, gray_world]
+    params:
+      alpha:
+        default: 0.4
+        range: [0.1, 1.0]
+        description: Detail remap. <1 enhances detail, >1 smooths.
+      beta:
+        default: 0.5
+        range: [0.1, 1.0]
+        description: Tone compression. Lower = stronger compression.
+      sigma:
+        default: 0.2
+        range: [0.05, 0.5]
+        description: Edge threshold. Higher = treats more as edges (preserves more).
+
+  vibrance:
+    family: saturation
+    cost: low
+    description: >-
+      Non-linear saturation — boosts muted colours more than already-vivid
+      ones, and protects skin hues. Prefer over `saturation` for portraits
+      and nature; pushing linear saturation hard turns skin orange and
+      clips foliage. Negative amount desaturates selectively, useful for
+      film/vintage looks.
+    region_aware: true
+    good_for: [Needs_Saturation_Increase]
+    bad_for: [Oversaturated_Global]
+    combines_well_with: [clahe_lab, exposure, gray_world]
+    params:
+      amount:
+        default: 0.4
+        range: [-1.0, 1.0]
+        description: Vibrance strength. Negative desaturates selectively.
+      skinProtect:
+        type: int
+        default: 1
+        range: [0, 1]
+        description: 1 = protect skin hues from boost (recommended).
+
+  gamut_compress:
+    family: saturation
+    cost: low
+    description: >-
+      ACES-style soft gamut compression — pulls over-saturated chroma back
+      toward neutral with a smooth knee while preserving hue. Use when
+      reds, blues or magentas are clipping for the output (sunset, neon,
+      heavily processed images). Cleaner than a global saturation pull-back
+      because it leaves already-tasteful colours alone.
+    region_aware: true
+    good_for: [Oversaturated_Global]
+    bad_for: [Needs_Saturation_Increase]
+    combines_well_with: [vibrance]
+    params:
+      threshold:
+        default: 0.8
+        range: [0.5, 1.0]
+        description: Chroma level at which compression starts.
+      limit:
+        default: 1.2
+        range: [1.0, 2.0]
+        description: Maximum chroma that maps to display gamut edge.
+
+  hsl_targeted:
+    family: saturation
+    cost: low
+    description: >-
+      Per-hue-band saturation control across six bands with Gaussian
+      feathering. Use for surgical fixes — "the dress is too saturated red"
+      without affecting greens or skies, or "lift the reds in this
+      underwater shot". Reach for this when the user names a specific colour.
+    region_aware: true
+    good_for: [Oversaturated_Red, Oversaturated_Green, Oversaturated_Blue,
+               Oversaturated_Cyan, Oversaturated_Magenta, Oversaturated_Yellow]
+    bad_for: []
+    combines_well_with: [vibrance, clahe_lab]
+    params:
+      redSat:     { default: 0.0, range: [-1.0, 1.0], description: Red band saturation delta. }
+      yellowSat:  { default: 0.0, range: [-1.0, 1.0], description: Yellow band saturation delta. }
+      greenSat:   { default: 0.0, range: [-1.0, 1.0], description: Green band saturation delta. }
+      cyanSat:    { default: 0.0, range: [-1.0, 1.0], description: Cyan band saturation delta. }
+      blueSat:    { default: 0.0, range: [-1.0, 1.0], description: Blue band saturation delta. }
+      magentaSat: { default: 0.0, range: [-1.0, 1.0], description: Magenta band saturation delta. }
+
+  ffcc:
+    family: white_balance
+    cost: medium
+    description: >-
+      Fast Fourier Colour Constancy (Barron & Tsai, CVPR 2017) — a learned
+      illuminant estimator. Outperforms statistical methods on mixed
+      lighting, unusual lamps, low light, and scenes where shades_of_gray
+      would be fooled by a dominant colour. Reach for this when statistical
+      WB looks wrong.
+    region_aware: false
+    good_for: [ColorCast_Red, ColorCast_Green, ColorCast_Blue,
+               ColorCast_Cyan, ColorCast_Magenta, ColorCast_Yellow]
+    bad_for: []
+    combines_well_with: [vibrance, clahe_lab]
+    params:
+      confidenceThreshold:
+        default: 0.5
+        range: [0.0, 1.0]
+        description: Minimum confidence to apply. Below this, falls back to shades_of_gray.
+
+  bm3d:
+    family: denoise
+    cost: high
+    description: >-
+      Block-Matching and 3D Filtering — state-of-the-art classical
+      denoiser. Apply BEFORE exposure or contrast steps; otherwise they'll
+      amplify the noise. Use shadowMaskOnly=1 in normal photography to
+      preserve mid-tone texture (skin pores, fabric weave). Increase sigma
+      with shadowNoiseRatio.
+    region_aware: true
+    good_for: [Needs_Noise_Reduction]
+    bad_for: []
+    combines_well_with: [clahe_lab, msrcr_retinex, vibrance]
+    params:
+      sigma:
+        default: 15.0
+        range: [5.0, 50.0]
+        description: Assumed noise std. Use ~10 + 20 * shadowNoiseRatio.
+      shadowMaskOnly:
+        type: int
+        default: 1
+        range: [0, 1]
+        description: 1 = restrict denoising to shadow regions (recommended).
+
+  memory_color_skin:
+    family: skin
+    cost: medium
+    description: >-
+      Memory-colour skin correction in CIE L*C*h° — the portrait anchor.
+      Viewers judge a portrait "correct" by skin, not by a neutral grey
+      card (Hunt & Fairchild). Run AFTER global white balance in portraits
+      to pull skin toward the preferred centroid without disturbing the
+      rest of the frame. Override targetLch for non-Caucasian populations.
+    region_aware: true
+    good_for: [SkinTone_Too_Green, SkinTone_Too_Magenta,
+               SkinTone_Too_Desaturated, SkinTone_Too_OrangeRed]
+    bad_for: []
+    combines_well_with: [vibrance, temperature_tint]
+    params:
+      adaptationStrength:
+        default: 0.6
+        range: [0.0, 1.0]
+        description: How aggressively to move skin toward the preferred centroid.
+      targetLch:
+        type: string
+        default: "68,28,38"
+        description: "Preferred skin centroid L*,C*,h° (Caucasian average; override for other populations)."
+
+
+  # --- Phase 2 — case-specific value-adds ------------------------------------
+
+  dark_channel_dehaze:
+    family: dehaze
+    cost: medium
+    description: >-
+      Single-image dehazing using the dark-channel prior (He et al., CVPR
+      2009). Restores contrast and saturation in genuinely hazy landscapes,
+      smoke, and underwater shots. Skip on clean images — over-dehazing
+      crushes blacks and reveals shadow noise. Pair with vibrance after.
+    region_aware: false
+    good_for: []
+    bad_for: [Needs_Noise_Reduction]
+    combines_well_with: [clahe_lab, vibrance]
+    params:
+      omega:
+        default: 0.95
+        range: [0.8, 1.0]
+        description: Haze retention. Lower = more residual haze for atmosphere.
+      t0:
+        default: 0.1
+        range: [0.05, 0.3]
+        description: Minimum transmission floor. Prevents division-by-zero / noise.
+
+  exposure_fusion:
+    family: hdr
+    cost: medium
+    description: >-
+      Multi-exposure fusion (Mertens et al., 2007). Blends a bracket directly
+      in the image domain using contrast/saturation/well-exposedness weights.
+      Requires an image bracket, not a single frame.
+    region_aware: false
+    good_for: []
+    bad_for: []
+    combines_well_with: [vibrance, clahe_lab]
+    params:
+      imagePaths:
+        type: string
+        description: Comma-separated absolute paths of bracketed exposures.
+      contrastWeight:    { default: 1.0, range: [0.0, 2.0], description: Weight for Laplacian contrast. }
+      saturationWeight:  { default: 1.0, range: [0.0, 2.0], description: Weight for per-pixel saturation. }
+      exposedWeight:     { default: 1.0, range: [0.0, 2.0], description: Weight for well-exposedness (Gaussian around mid). }
+
+  reinhard_tonemap:
+    family: hdr
+    cost: medium
+    description: >-
+      Photographic tone mapping (Reinhard 2002). Natural, film-like global
+      operator — the right default when compressing HDR for display.
+    region_aware: false
+    good_for: []
+    bad_for: []
+    combines_well_with: [vibrance, clahe_lab]
+    params:
+      keyValue:
+        default: 0.18
+        range: [0.05, 0.5]
+        description: Target scene brightness (zone V in Ansel Adams terms).
+      whitePoint:
+        default: 1.0
+        range: [0.5, 4.0]
+        description: Burn-out threshold. Higher preserves more highlight detail.
+
+  mantiuk_tonemap:
+    family: hdr
+    cost: high
+    description: >-
+      Perceptual tone mapping (Mantiuk '08). Compresses dynamic range while
+      preserving local contrast per human-visual contrast sensitivity.
+      Best all-round operator in most TMO comparisons.
+    region_aware: false
+    good_for: []
+    bad_for: []
+    combines_well_with: [vibrance]
+    params:
+      saturation:
+        default: 1.0
+        range: [0.0, 2.0]
+        description: Colour saturation after tone mapping.
+      contrastScale:
+        default: 0.75
+        range: [0.1, 1.0]
+        description: Contrast compression factor. Lower = stronger compression.
+
+  ace:
+    family: auto
+    cost: high
+    description: >-
+      Automatic Colour Equalization (Rizzi et al.) — unsupervised global +
+      local correction modelled on the human visual system. A solid
+      one-shot fallback when the scene defies categorisation (mixed
+      lighting + multiple problems at once) or when the user just wants an
+      "auto-fix" button. Slower than statistical WB; reach for it last.
+    region_aware: false
+    good_for: [ColorCast_Red, ColorCast_Green, ColorCast_Blue,
+               ColorCast_Cyan, ColorCast_Magenta, ColorCast_Yellow,
+               Needs_Exposure_Increase, Needs_Contrast_Increase]
+    bad_for: []
+    combines_well_with: [vibrance, memory_color_skin]
+    params:
+      alpha:
+        default: 5.0
+        range: [1.0, 10.0]
+        description: Slope parameter. Higher = stronger correction.
+      subsample:
+        type: int
+        default: 4
+        range: [1, 8]
+        description: Subsample factor. Higher = faster, less precise.
+
+  harmonization:
+    family: creative
+    cost: medium
+    description: >-
+      Cohen-Or colour harmonization. Shifts hues to fit a classical harmony
+      template (i/V/L/I/T/Y/X/N-type) while preserving spatial coherence.
+      Creative tool, not an auto-fix.
+    region_aware: false
+    good_for: []
+    bad_for: []
+    combines_well_with: [vibrance]
+    params:
+      template:
+        type: string
+        default: "I"
+        description: One of i, V, L, I, T, Y, X, N.
+      offsetDeg:
+        default: 0.0
+        range: [0.0, 360.0]
+        description: Template rotation on the hue wheel.
+
+
+# =============================================================================
+# issue_to_algorithms — the primary recommender table.
+#
+# Every ImageIssue enum value must have an entry (startup parity check).
+#
+# primary        single algorithm id. The agent calls this first when this
+#                issue dominates.
+# alternatives   ordered list of fallbacks. The agent tries these when the
+#                user rejects the primary, when cost budget is low, or when
+#                the detected issue set suggests the primary would conflict
+#                with another selected step.
+# param_hints    free-form natural-language rules, keyed by algorithm id, that
+#                tell the agent how to derive parameter values from the
+#                features returned by analyzeImage. Keep these short — the
+#                agent reads them verbatim.
+# =============================================================================
+
+issue_to_algorithms:
+
+  Needs_Exposure_Increase:
+    primary: msrcr_retinex
+    alternatives: [exposure, ace, exposure_fusion]
+    param_hints:
+      msrcr_retinex: >-
+        strength = 0.9 when medianY < 0.15, 0.7 otherwise.
+      exposure: >-
+        gain = 0.5 / medianY (capped at 2.5).
+
+  Needs_Exposure_Decrease:
+    primary: highlight_recovery
+    alternatives: [exposure, reinhard_tonemap]
+    param_hints:
+      exposure: >-
+        gain = 0.5 / medianY (floored at 0.4).
+      highlight_recovery: >-
+        Start strength=1.0; drop to 0.6 when whitePct < 0.02.
+
+  Needs_Contrast_Increase:
+    primary: clahe_lab
+    alternatives: [ace, local_laplacian]
+    param_hints:
+      clahe_lab: >-
+        clipLimit = 2.0 for natural look; 3–4 for dramatic.
+        Use tileGrid=8 default; drop to 4 for strong local boost.
+
+  Needs_Contrast_Decrease:
+    primary: local_laplacian
+    alternatives: [reinhard_tonemap, mantiuk_tonemap]
+    param_hints:
+      local_laplacian: >-
+        beta = 0.3 when (p95Y - p5Y) > 0.9 (very high contrast),
+        else 0.5.
+
+  Needs_Saturation_Increase:
+    primary: vibrance
+    alternatives: [saturation, ace]
+    param_hints:
+      vibrance: >-
+        amount = 0.3 + 0.4 * (1 - meanS); clamp to [0.2, 0.6].
+        Keep skinProtect=1 unless the user is editing a non-portrait.
+
+  Oversaturated_Global:
+    primary: gamut_compress
+    alternatives: [saturation]
+    param_hints:
+      gamut_compress: >-
+        threshold = 0.75 when p95S > 0.95, else 0.8.
+      saturation: >-
+        factor = 0.85 as a safe pull-back.
+
+  Oversaturated_Red:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set redSat = -0.3."
+
+  Oversaturated_Green:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set greenSat = -0.3."
+
+  Oversaturated_Blue:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set blueSat = -0.3."
+
+  Oversaturated_Cyan:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set cyanSat = -0.3."
+
+  Oversaturated_Magenta:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set magentaSat = -0.3."
+
+  Oversaturated_Yellow:
+    primary: hsl_targeted
+    alternatives: [gamut_compress]
+    param_hints:
+      hsl_targeted: "Set yellowSat = -0.3."
+
+  ColorCast_Red:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, gray_world, temperature_tint]
+    param_hints:
+      temperature_tint: >-
+        Increase tempK by ~500–1000 K to cool a red cast; if labABDist > 20
+        increase by up to 1500.
+
+  ColorCast_Green:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, temperature_tint]
+    param_hints:
+      temperature_tint: "Set tint in [-0.3, -0.15] (toward magenta)."
+
+  ColorCast_Blue:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, gray_world, temperature_tint]
+    param_hints:
+      temperature_tint: >-
+        Decrease tempK by ~500–1500 K to warm a blue cast.
+
+  ColorCast_Cyan:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, temperature_tint]
+    param_hints: {}
+
+  ColorCast_Magenta:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, temperature_tint]
+    param_hints:
+      temperature_tint: "Set tint in [+0.15, +0.3] (toward green)."
+
+  ColorCast_Yellow:
+    primary: ffcc
+    alternatives: [ace, shades_of_gray, temperature_tint]
+    param_hints:
+      temperature_tint: >-
+        Increase tempK by ~1000–2000 K to cool a yellow cast.
+
+  Needs_Noise_Reduction:
+    primary: bm3d
+    alternatives: []
+    param_hints:
+      bm3d: >-
+        sigma = 10 + 20 * shadowNoiseRatio, clamped to [5, 50].
+        Keep shadowMaskOnly=1 to preserve mid-tone texture.
+
+  SkinTone_Too_Green:
+    primary: memory_color_skin
+    alternatives: [temperature_tint]
+    param_hints:
+      temperature_tint: "Set tint in [-0.3, -0.15]."
+
+  SkinTone_Too_Magenta:
+    primary: memory_color_skin
+    alternatives: [temperature_tint]
+    param_hints:
+      temperature_tint: "Set tint in [+0.15, +0.3]."
+
+  SkinTone_Too_Desaturated:
+    primary: memory_color_skin
+    alternatives: [vibrance]
+    param_hints:
+      memory_color_skin: "adaptationStrength = 0.7 when meanS < 0.25."
+
+  SkinTone_Too_OrangeRed:
+    primary: memory_color_skin
+    alternatives: [hsl_targeted]
+    param_hints:
+      hsl_targeted: "Set redSat = -0.2; small blueSat = +0.1 to balance."
+
+  Hazy:
+    primary: dark_channel_dehaze
+    alternatives: [clahe_lab]
+    param_hints:
+      dark_channel_dehaze: >-
+        omega = 0.95 default. Lower to 0.85 when darkChannelMean > 0.4
+        to avoid over-dehazing very thick haze.
+
+  Crushed_Shadows:
+    primary: local_laplacian
+    alternatives: [exposure_fusion, exposure]
+    param_hints:
+      local_laplacian: >-
+        beta = 0.6 to lift shadows without crushing highlights;
+        sigma = 0.3 keeps the lift in the dark range.
+      exposure: "gain = 1.15 — modest global lift."
+
+  Clipped_Highlights:
+    primary: highlight_recovery
+    alternatives: [reinhard_tonemap, exposure_fusion]
+    param_hints:
+      highlight_recovery: >-
+        strength = 1.0 by default; raise to 1.3 when whitePct > 0.10.
+
+
+# =============================================================================
+# workflows — named multi-step chains for common scenarios.
+#
+# The agent surfaces these via `listWorkflows`. Each `when` clause is an
+# ImageIssue-set predicate — if ALL issues listed are present, the workflow
+# becomes a candidate. Steps execute in order; each step inherits the
+# commit (working-baseline) produced by the previous.
+# =============================================================================
+
+workflows:
+
+  portrait_restoration:
+    description: Underexposed portrait with skin drift and shadow noise.
+    when: [Needs_Exposure_Increase, Needs_Noise_Reduction]
+    steps:
+      - msrcr_retinex
+      - bm3d
+      - memory_color_skin
+      - vibrance
+
+  landscape_dehaze:
+    description: Hazy, flat-contrast landscape with muted colour.
+    when: [Needs_Contrast_Increase, Needs_Saturation_Increase]
+    steps:
+      - dark_channel_dehaze
+      - clahe_lab
+      - vibrance
+
+  high_contrast_recovery:
+    description: Harsh sunlight scene with blown highlights and crushed shadows.
+    when: [Needs_Contrast_Decrease, Needs_Exposure_Decrease]
+    steps:
+      - highlight_recovery
+      - local_laplacian
+      - vibrance
+
+  cast_and_dull:
+    description: General mixed-lighting shot — cast plus flat saturation.
+    when: [ColorCast_Yellow, Needs_Saturation_Increase]
+    steps:
+      - ffcc
+      - vibrance
+
+  auto_one_click:
+    description: "Agent fallback when the user asks for a single 'Auto-fix' button."
+    when: []
+    steps:
+      - ace
+      - vibrance

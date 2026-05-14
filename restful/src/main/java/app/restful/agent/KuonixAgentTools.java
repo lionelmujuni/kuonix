@@ -15,9 +15,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import app.restful.dto.ImageFeatures;
 import app.restful.dto.ImageIssue;
+import app.restful.services.AlgorithmKnowledgeGraph;
 import app.restful.services.ColorCorrectionService;
-import app.restful.services.ImageAnalysisService;
 import app.restful.services.ImageClassifierService;
+import app.restful.services.ImageFeaturesCache;
 import app.restful.services.StorageService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
@@ -53,20 +54,36 @@ public class KuonixAgentTools {
         return c;
     }
 
-    private final ImageAnalysisService   analysisService;
-    private final ImageClassifierService classifierService;
-    private final ColorCorrectionService correctionService;
-    private final StorageService         storageService;
-    private final ObjectMapper           mapper;
+    /**
+     * Side-channel for committed corrections — promoted baselines that the
+     * frontend must switch to so subsequent corrections chain on top.
+     */
+    public record CommitResult(String workingPath, String base64, String method, Map<String, Object> params) {}
+    private static final ThreadLocal<CommitResult> pendingCommit = new ThreadLocal<>();
 
-    public KuonixAgentTools(ImageAnalysisService analysisService,
+    public static CommitResult consumePendingCommit() {
+        CommitResult c = pendingCommit.get();
+        pendingCommit.remove();
+        return c;
+    }
+
+    private final ImageFeaturesCache        featuresCache;
+    private final ImageClassifierService    classifierService;
+    private final ColorCorrectionService    correctionService;
+    private final StorageService            storageService;
+    private final AlgorithmKnowledgeGraph   knowledgeGraph;
+    private final ObjectMapper              mapper;
+
+    public KuonixAgentTools(ImageFeaturesCache featuresCache,
                             ImageClassifierService classifierService,
                             ColorCorrectionService correctionService,
-                            StorageService storageService) {
-        this.analysisService   = analysisService;
+                            StorageService storageService,
+                            AlgorithmKnowledgeGraph knowledgeGraph) {
+        this.featuresCache     = featuresCache;
         this.classifierService = classifierService;
         this.correctionService = correctionService;
         this.storageService    = storageService;
+        this.knowledgeGraph    = knowledgeGraph;
         this.mapper            = new ObjectMapper();
     }
 
@@ -74,17 +91,18 @@ public class KuonixAgentTools {
     // Tool: analyzeImage
     // -------------------------------------------------------------------------
 
-    @Tool("Analyse a single image and return its photographic quality metrics as JSON. " +
-          "Returns brightness (medianY 0-1), contrast (p5Y and p95Y span), " +
-          "saturation (meanS, p95S 0-1), colour cast (labABDist, castAngleDeg 0-360), " +
-          "and shadow noise ratio. Use this before classifyIssues to understand the image.")
+    @Tool("Read the photograph's quality metrics: brightness (medianY 0-1), " +
+          "contrast span (p5Y, p95Y), saturation (meanS, p95S), colour cast " +
+          "(labABDist + castAngleDeg 0-360°), shadow noise. Returns compact JSON. " +
+          "Skip when the user's message already includes analysis data — every " +
+          "uploaded image is auto-analysed and the data is often inlined.")
     public String analyzeImage(
             @P("Absolute file path of the image to analyse") String imagePath) {
 
         Path path = validateWorkspacePath(imagePath);
         log.info("[agent] analyzeImage: {}", path.getFileName());
 
-        ImageFeatures f = analysisService.compute(path, false);
+        ImageFeatures f = featuresCache.get(path, false);
 
         // Compact subset — verbose pixel data would waste tokens
         Map<String, Object> compact = Map.ofEntries(
@@ -100,7 +118,8 @@ public class KuonixAgentTools {
                 Map.entry("p95S",             round(f.p95S())),
                 Map.entry("labABDist",        round(f.labABDist())),
                 Map.entry("castAngleDeg",     round(f.castAngleDeg())),
-                Map.entry("shadowNoiseRatio", round(f.shadowNoiseRatio()))
+                Map.entry("shadowNoiseRatio", round(f.shadowNoiseRatio())),
+                Map.entry("darkChannelMean",  round(f.darkChannelMean()))
         );
 
         return toJson(compact);
@@ -110,17 +129,17 @@ public class KuonixAgentTools {
     // Tool: classifyIssues
     // -------------------------------------------------------------------------
 
-    @Tool("Detect quality issues in an image. " +
-          "Returns a comma-separated list of detected ImageIssue values such as " +
-          "Needs_Exposure_Increase, ColorCast_Blue, Needs_Noise_Reduction, etc. " +
-          "Returns 'none' when no issues are found.")
+    @Tool("Tag the photograph with concrete problems — exposure direction, colour " +
+          "cast, contrast, saturation, noise, skin drift, haze, clipping. Returns " +
+          "a comma-separated list of issues, or 'none' when the image is already " +
+          "clean. Skip when the user's message already lists detected issues.")
     public String classifyIssues(
             @P("Absolute file path of the image to classify") String imagePath) {
 
         Path path = validateWorkspacePath(imagePath);
         log.info("[agent] classifyIssues: {}", path.getFileName());
 
-        ImageFeatures    f      = analysisService.compute(path, false);
+        ImageFeatures    f      = featuresCache.get(path, false);
         List<ImageIssue> issues = classifierService.classify(f);
 
         if (issues.isEmpty()) return "none";
@@ -128,20 +147,75 @@ public class KuonixAgentTools {
     }
 
     // -------------------------------------------------------------------------
+    // Tool: recommendCorrections
+    // -------------------------------------------------------------------------
+
+    @Tool("Rank correction methods for a set of detected issues, weighted by what " +
+          "each method is known to fix and what it can make worse. Returns ranked " +
+          "candidates with a reason and suggested parameters. Score reflects fit, " +
+          "not creative quality — a low-scoring method may still be the right look. " +
+          "Call this when you have an issue list and want a defensible first pick.")
+    public String recommendCorrections(
+            @P("Comma-separated ImageIssue values (the string returned by classifyIssues). " +
+               "Pass 'none' to get an empty list.") String issuesCsv) {
+
+        if (issuesCsv == null || issuesCsv.isBlank() || "none".equalsIgnoreCase(issuesCsv.trim())) {
+            return "[]";
+        }
+        List<String> issues = java.util.Arrays.stream(issuesCsv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        log.info("[agent] recommendCorrections: issues={}", issues);
+        return toJson(knowledgeGraph.recommend(issues));
+    }
+
+    // -------------------------------------------------------------------------
+    // Tool: describeAlgorithm
+    // -------------------------------------------------------------------------
+
+    @Tool("Look up everything Kuonix knows about one method — what it does, when " +
+          "it shines, what it can ruin, parameter ranges and defaults, methods it " +
+          "chains well with. Use this when the user asks for an explanation of a " +
+          "method, when you need parameter ranges before previewing, or when a " +
+          "recommended method seems risky for this particular image.")
+    public String describeAlgorithm(
+            @P("Algorithm id, e.g. 'clahe_lab', 'vibrance', 'shades_of_gray'") String algoId) {
+
+        log.info("[agent] describeAlgorithm: {}", algoId);
+        return knowledgeGraph.describe(algoId)
+                .map(this::toJson)
+                .orElse("{\"error\":\"unknown algorithm: " + algoId + "\"}");
+    }
+
+    // -------------------------------------------------------------------------
+    // Tool: listWorkflows
+    // -------------------------------------------------------------------------
+
+    @Tool("List multi-step recipes for common scenarios — portrait restoration, " +
+          "landscape dehaze, high-contrast recovery. Each is a named ordered chain " +
+          "with a 'when' predicate (the issue set that justifies it). Use when an " +
+          "image clearly fits a recipe and the user wants a single coherent pass " +
+          "rather than step-by-step decisions.")
+    public String listWorkflows() {
+        log.info("[agent] listWorkflows");
+        return toJson(knowledgeGraph.availableWorkflows());
+    }
+
+    // -------------------------------------------------------------------------
     // Tool: previewCorrection
     // -------------------------------------------------------------------------
 
-    @Tool("Generate a corrected preview of an image and return a JSON object with the Base64 JPEG data URL, " +
-          "the correction method, and parameters used. " +
-          "Available methods: temperature_tint, gray_world, white_patch, shades_of_gray, exposure, " +
-          "saturation, color_matrix, color_distribution_alignment. " +
-          "Always call previewCorrection before applyCorrection so the user can confirm.")
+    @Tool("Produce a non-destructive preview of one correction. The result lands as " +
+          "a before/after card in the user's view; nothing is written to disk. " +
+          "ALWAYS preview before commit or apply — the user must see the result " +
+          "before agreeing. Pick the method via recommendCorrections or " +
+          "describeAlgorithm; do not guess parameters from memory.")
     public String previewCorrection(
             @P("Absolute file path of the image") String imagePath,
-            @P("Correction method id: temperature_tint | gray_world | white_patch | shades_of_gray | " +
-               "exposure | saturation | color_matrix | color_distribution_alignment") String method,
-            @P("JSON object of parameter name to numeric value, e.g. {\"gain\": 1.2}. " +
-               "Use {} when the method needs no parameters.") String parametersJson) {
+            @P("Algorithm id — obtain from recommendCorrections or listWorkflows") String method,
+            @P("JSON parameters, e.g. {\"gain\":1.2}. Use {} for defaults; see describeAlgorithm for schema.") String parametersJson) {
 
         Path path   = validateWorkspacePath(imagePath);
         Map<String, Object> params = parseParams(parametersJson);
@@ -157,16 +231,68 @@ public class KuonixAgentTools {
     }
 
     // -------------------------------------------------------------------------
-    // Tool: applyCorrection
+    // Tool: commitCorrection
     // -------------------------------------------------------------------------
 
-    @Tool("Apply a colour correction permanently and save the result to the workspace. " +
-          "Only call this after the user has explicitly confirmed the preview looks correct. " +
+    @Tool("Lock the previewed correction in as the new working baseline. The next " +
+          "correction will chain on top of this result, not the original. NOT an " +
+          "export — just an internal step file. ONLY call after the user explicitly " +
+          "agrees ('yes', 'apply', 'looks good', 'go ahead'). Use the SAME method " +
+          "and parameters that were just previewed. After this call, the returned " +
+          "working path IS the current image for any further edits.")
+    public String commitCorrection(
+            @P("Absolute file path of the source image (current baseline)") String imagePath,
+            @P("Algorithm id — same as previewed") String method,
+            @P("JSON parameters — same as previewed") String parametersJson) {
+
+        Path path = validateWorkspacePath(imagePath);
+        Map<String, Object> params = parseParams(parametersJson);
+
+        log.info("[agent] commitCorrection: {} method={}", path.getFileName(), method);
+
+        // Derive step number from current filename: foo_step2_... → step 3
+        String filename = path.getFileName().toString();
+        int dot = filename.lastIndexOf('.');
+        String baseName = dot > 0 ? filename.substring(0, dot) : filename;
+
+        int step = 1;
+        String rootName = baseName;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.*)_step(\\d+)_.+$").matcher(baseName);
+        if (m.matches()) {
+            rootName = m.group(1);
+            step = Integer.parseInt(m.group(2)) + 1;
+        }
+
+        Path outputPath = storageService.getWorkingDir()
+                .resolve(rootName + "_step" + step + "_" + method + ".jpg");
+
+        correctionService.processAndSaveImage(path, outputPath, method, params);
+
+        try {
+            byte[] savedBytes = java.nio.file.Files.readAllBytes(outputPath);
+            String base64 = "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(savedBytes);
+            pendingCommit.set(new CommitResult(outputPath.toAbsolutePath().toString(), base64, method, params));
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Failed to read committed working file: " + outputPath, e);
+        }
+
+        return "Committed correction '" + method + "' — the image is now updated. " +
+               "Further corrections will build on this result.";
+    }
+
+    // -------------------------------------------------------------------------
+    // Tool: applyCorrection (export only)
+    // -------------------------------------------------------------------------
+
+    @Tool("Write the final corrected image to the user-visible workspace folder " +
+          "as a permanent JPEG. ONLY call when the user explicitly asks to 'save', " +
+          "'export', or 'download'. For regular preview → confirm → next-step loops " +
+          "use commitCorrection — apply ends the editing session for that image. " +
           "Returns the saved output file path.")
     public String applyCorrection(
             @P("Absolute file path of the source image") String imagePath,
-            @P("Correction method id (same values as previewCorrection)") String method,
-            @P("JSON object of parameter name to numeric value, e.g. {\"gain\": 1.2}") String parametersJson) {
+            @P("Algorithm id — same as committed/previewed") String method,
+            @P("JSON parameters — same as committed/previewed") String parametersJson) {
 
         Path path   = validateWorkspacePath(imagePath);
         Map<String, Object> params = parseParams(parametersJson);

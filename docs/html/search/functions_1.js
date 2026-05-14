@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['cameramatrixcache_0',['CameraMatrixCache',['../classapp_1_1restful_1_1services_1_1_camera_matrix_cache.html#ac30d7f07c0254db613e6b5cd529ac3e1',1,'app::restful::services::CameraMatrixCache']]],
+  ['chat_1',['chat',['../interfaceapp_1_1restful_1_1agent_1_1_kuonix_ai_service.html#af6b6c378834a1ab201a84b05146b1490',1,'app.restful.agent.KuonixAiService.chat()'],['../classapp_1_1restful_1_1api_1_1_agent_controller.html#a4b2b2e59a90449235b982028d1eea250',1,'app.restful.api.AgentController.chat()']]],
+  ['chatmemoryprovider_2',['chatMemoryProvider',['../classapp_1_1restful_1_1config_1_1_agent_config.html#a1be06e112c626cdb452e5967bee41ebd',1,'app::restful::config::AgentConfig']]],
+  ['classify_3',['classify',['../classapp_1_1restful_1_1api_1_1_image_analysis_controller.html#a9b1ada2ba210270ebcf577097b942109',1,'app.restful.api.ImageAnalysisController.classify()'],['../classapp_1_1restful_1_1services_1_1_image_classifier_service.html#a04829a77eada9b0a6588403cf3659cf6',1,'app.restful.services.ImageClassifierService.classify()']]],
+  ['classifyissues_4',['classifyIssues',['../classapp_1_1restful_1_1agent_1_1_kuonix_agent_tools.html#a367e3359a5b07ca09ffb8a7713eb036e',1,'app::restful::agent::KuonixAgentTools']]],
+  ['classifyresponse_5',['ClassifyResponse',['../namespaceapp_1_1restful_1_1dto.html#a83c77de95541d9cd81ae2dbbcdb10a73',1,'app::restful::dto']]],
+  ['classifywithprogress_6',['classifyWithProgress',['../classapp_1_1restful_1_1api_1_1_image_analysis_controller.html#a43b939ad7daa8ca437eed095b37685c7',1,'app::restful::api::ImageAnalysisController']]],
+  ['cleanoldentries_7',['cleanOldEntries',['../classapp_1_1restful_1_1services_1_1_raw_image_cache.html#a9270d1b3092b128e9ff7009c3b84a879',1,'app::restful::services::RawImageCache']]],
+  ['cleanuporphanedtempdirectories_8',['cleanupOrphanedTempDirectories',['../classapp_1_1restful_1_1services_1_1_temp_directory_cleanup_service.html#a14947137fc383b07f3564b264c4d4864',1,'app::restful::services::TempDirectoryCleanupService']]],
+  ['cleanuptempdirectories_9',['cleanupTempDirectories',['../classapp_1_1restful_1_1api_1_1_admin_controller.html#a358a51806ec74012265e846c9fbee0de',1,'app::restful::api::AdminController']]],
+  ['cleanworkspace_10',['cleanWorkspace',['../classapp_1_1restful_1_1services_1_1_storage_service.html#a91db83dba6afa763dc3ba02a62ad4626',1,'app::restful::services::StorageService']]],
+  ['clear_11',['clear',['../classapp_1_1restful_1_1services_1_1_raw_image_cache.html#afe09737a69f977b7438037ef72da8115',1,'app::restful::services::RawImageCache']]],
+  ['clearcache_12',['clearCache',['../classapp_1_1restful_1_1services_1_1_settings_service.html#a2e2cf3c715c3e36f1092b1b46baae99c',1,'app::restful::services::SettingsService']]],
+  ['colorcorrectioncontroller_13',['ColorCorrectionController',['../classapp_1_1restful_1_1api_1_1_color_correction_controller.html#a327087284a66d36d95a3f7fbc81d2143',1,'app::restful::api::ColorCorrectionController']]],
+  ['colorcorrectionmethod_14',['ColorCorrectionMethod',['../namespaceapp_1_1restful_1_1dto.html#af09838e3e60f48ebbfbb35d9ad609672',1,'app::restful::dto']]],
+  ['colorcorrectionrequest_15',['ColorCorrectionRequest',['../namespaceapp_1_1restful_1_1dto.html#ad079ddd40b39c423cc2d1961d333063d',1,'app::restful::dto']]],
+  ['colorcorrectionresult_16',['ColorCorrectionResult',['../namespaceapp_1_1restful_1_1dto.html#addf77b97b7954091c4d7558665a8bd24',1,'app::restful::dto']]],
+  ['colorcorrectionservice_17',['ColorCorrectionService',['../classapp_1_1restful_1_1services_1_1_color_correction_service.html#a1a98c0c8f9ab5eb6a24f5c30906fb2ff',1,'app::restful::services::ColorCorrectionService']]],
+  ['compute_18',['compute',['../classapp_1_1restful_1_1services_1_1_image_analysis_service.html#a3a8c6755665b79874177cd1b62f9a2e9',1,'app::restful::services::ImageAnalysisService']]],
+  ['consumependingcorrection_19',['consumePendingCorrection',['../classapp_1_1restful_1_1agent_1_1_kuonix_agent_tools.html#af59fccc49fa9b4b0a5d2a7f155609441',1,'app::restful::agent::KuonixAgentTools']]],
+  ['correctionpayload_20',['CorrectionPayload',['../classapp_1_1restful_1_1agent_1_1_correction_side_channel.html#a73c783471b4c0ce822d704879954a7a6',1,'app::restful::agent::CorrectionSideChannel']]],
+  ['correctionpreview_21',['CorrectionPreview',['../classapp_1_1restful_1_1agent_1_1_kuonix_agent_tools.html#a45f31deba111d539b11c4f40bbb6b0d9',1,'app::restful::agent::KuonixAgentTools']]],
+  ['corsconfigurer_22',['corsConfigurer',['../classapp_1_1restful_1_1config_1_1_cors_config.html#ae32ee11408315c55bc4859864b7cec0b',1,'app::restful::config::CorsConfig']]]
+];

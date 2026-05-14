@@ -124,6 +124,11 @@ public class ImageAnalysisService {
         Mat shadowMask = compareFloat(y, /*<=*/ true, 0.35);
         double noiseRatio = shadowResidualRatio(y, shadowMask);
 
+        // Dark-channel haze proxy (He et al. 2009). Per-pixel min over BGR,
+        // eroded with a small kernel, then averaged. Clear images sit near 0;
+        // hazy images push it above ~0.25.
+        double darkChannelMean = darkChannelMean(bgrF);
+
         // Skin (optional): OFF by default to avoid cascade shipping. Hook present for future.
         boolean hasSkin = false;
         double skinHueMean = 0.0;
@@ -143,8 +148,32 @@ public class ImageAnalysisService {
                 overRed, overGreen, overBlue, overCyan, overMagenta, overYellow,
                 aMean, bMean, abDist, castAngle,
                 noiseRatio,
-                hasSkin, skinHueMean, skinSatMean
+                hasSkin, skinHueMean, skinSatMean,
+                darkChannelMean
         );
+    }
+
+    /**
+     * Mean of the dark channel over [0, 1]. The dark channel is the per-pixel
+     * minimum across BGR (after a small min-erosion). For haze-free outdoor
+     * images this stays close to 0; haze adds a non-zero offset to all
+     * channels, raising it sharply.
+     */
+    private static double darkChannelMean(Mat bgrF) {
+        MatVector ch = new MatVector(3);
+        opencv_core.split(bgrF, ch);
+        Mat minBG = new Mat();
+        opencv_core.min(ch.get(0), ch.get(1), minBG);
+        Mat minBGR = new Mat();
+        opencv_core.min(minBG, ch.get(2), minBGR);
+        Mat eroded = new Mat();
+        Mat kernel = opencv_imgproc.getStructuringElement(
+                opencv_imgproc.MORPH_RECT, new Size(7, 7));
+        opencv_imgproc.erode(minBGR, eroded, kernel);
+        double m = opencv_core.mean(eroded).get(0);
+        ch.close();
+        minBG.release(); minBGR.release(); eroded.release(); kernel.release();
+        return m;
     }
 
     // --- helpers ---

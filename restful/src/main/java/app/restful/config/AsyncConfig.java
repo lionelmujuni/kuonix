@@ -43,4 +43,19 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean(name = "analysisExecutor")
+    public Executor analysisExecutor() {
+        int cores = Runtime.getRuntime().availableProcessors();
+        int max = Math.max(2, Math.min(cores, 4));
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(max);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("analysis-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(120);
+        executor.initialize();
+        return executor;
+    }
 }

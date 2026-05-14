@@ -84,14 +84,12 @@ public class SettingsController {
     @GetMapping("/ollama/models")
     public List<ModelOption> getAvailableModels() {
         return List.of(
-            new ModelOption("qwen3.5:cloud",            "Qwen 3.5",              "Best all-rounder, vision + tools + thinking"),
-            new ModelOption("gemma4:31b-cloud",         "Gemma 4 (31B)",          "Google's latest, vision + tools + thinking + audio"),
-            new ModelOption("minimax-m2.7:cloud",       "MiniMax M2.7",           "Coding and agentic workflows"),
-            new ModelOption("kimi-k2.5:cloud",          "Kimi K2.5",              "Multimodal agentic, vision + tools"),
-            new ModelOption("glm-5.1:cloud",            "GLM 5.1",                "Flagship agentic engineering model"),
-            new ModelOption("qwen3-coder-next:cloud",   "Qwen3 Coder Next",       "Optimized for coding agents"),
-            new ModelOption("devstral-small-2:24b-cloud", "Devstral Small 2 (24B)", "Tool use for codebases"),
-            new ModelOption("nemotron-3-nano:30b-cloud", "Nemotron 3 Nano (30B)",  "NVIDIA efficient agentic model")
+            new ModelOption("qwen3.5:cloud",          "Qwen 3.5 · Paid",         "Best all-rounder, vision + tools + thinking"),
+            new ModelOption("minimax-m2.7:cloud",     "MiniMax M2.7 · Paid",     "Coding and agentic workflows"),
+            new ModelOption("kimi-k2.6:cloud",        "Kimi K2.6 · Paid",        "Multimodal agentic, vision + tools"),
+            new ModelOption("glm-5.1:cloud",          "GLM 5.1 · Paid",          "Flagship agentic engineering model"),
+            new ModelOption("nemotron-3-super:cloud", "Nemotron 3 Super · Free", "NVIDIA agentic model — no paid plan required"),
+            new ModelOption("gemma4:31b-cloud",       "Gemma 4 (31B) · Free",    "Google's latest — no paid plan required")
         );
     }
 

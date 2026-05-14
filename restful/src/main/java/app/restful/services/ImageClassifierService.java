@@ -59,6 +59,26 @@ public class ImageClassifierService {
             labels.add(ImageIssue.Needs_Noise_Reduction);
         }
 
+        // Haze: dark-channel veil above floor.
+        if (f.darkChannelMean() >= th.getHazeDarkChannelMin()) {
+            labels.add(ImageIssue.Hazy);
+        }
+
+        // Crushed shadows: lots of near-black pixels but the picture as a
+        // whole is not underexposed — shadows are clipped, not the scene dark.
+        if (f.blackPct() >= th.getCrushedShadowsBlackTailMinPct()
+                && f.medianY() >= th.getCrushedShadowsMedianMin()) {
+            labels.add(ImageIssue.Crushed_Shadows);
+        }
+
+        // Clipped highlights: lots of near-white pixels but median sits in the
+        // normal range — bright sky/lights are blown without the rest of the
+        // frame being overexposed.
+        if (f.whitePct() >= th.getClippedHighlightsWhiteTailMinPct()
+                && f.medianY() <= th.getClippedHighlightsMedianMax()) {
+            labels.add(ImageIssue.Clipped_Highlights);
+        }
+
         // Skin (currently feature OFF unless you add detection)
         if (f.hasSkin()) {
             double hue = f.skinHueMeanDeg();

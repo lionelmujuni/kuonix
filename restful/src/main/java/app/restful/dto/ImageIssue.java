@@ -23,5 +23,8 @@ public enum ImageIssue {
     SkinTone_Too_Green,
     SkinTone_Too_Magenta,
     SkinTone_Too_Desaturated,
-    SkinTone_Too_OrangeRed
+    SkinTone_Too_OrangeRed,
+    Hazy,
+    Crushed_Shadows,
+    Clipped_Highlights
 }

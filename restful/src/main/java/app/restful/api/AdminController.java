@@ -1,13 +1,15 @@
 package app.restful.api;
 
-import app.restful.services.TempDirectoryCleanupService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import app.restful.services.TempDirectoryCleanupService;
 
 /**
  * REST controller for administrative operations.
@@ -28,6 +30,11 @@ public class AdminController {
         this.cleanupService = cleanupService;
     }
     
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        return ResponseEntity.ok("ok");
+    }
+
     /**
      * Manually trigger cleanup of orphaned temporary directories.
      * 

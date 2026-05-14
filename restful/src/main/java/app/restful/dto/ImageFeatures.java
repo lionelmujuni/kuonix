@@ -9,5 +9,6 @@ public record ImageFeatures(
         boolean overCyan, boolean overMagenta, boolean overYellow,
         double labAMean, double labBMean, double labABDist, double castAngleDeg,
         double shadowNoiseRatio,
-        boolean hasSkin, double skinHueMeanDeg, double skinSatMean
+        boolean hasSkin, double skinHueMeanDeg, double skinSatMean,
+        double darkChannelMean
 ) {}

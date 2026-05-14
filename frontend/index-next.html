@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: img:; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net; script-src 'self'; connect-src http://localhost:8081" />
+  <title>Kuonix</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+  <link rel="stylesheet" href="src/styles/tokens.css" />
+  <link rel="stylesheet" href="src/styles/reset.css" />
+  <link rel="stylesheet" href="src/styles/typography.css" />
+  <link rel="stylesheet" href="src/styles/glass.css" />
+  <link rel="stylesheet" href="src/styles/shell.css" />
+  <link rel="stylesheet" href="src/styles/components.css" />
+</head>
+<body>
+  <div class="ambient-grain" aria-hidden="true"></div>
+  <div class="app-shell">
+
+    <!-- Titlebar -->
+    <header class="titlebar">
+      <div class="titlebar__brand">
+        <span class="titlebar__brand-mark" aria-hidden="true"></span>
+        <span>Kuonix</span>
+      </div>
+
+      <button id="conn-status" class="conn-status" data-state="checking" aria-label="Backend status" title="Checking backend…">
+        <span class="conn-status__dot" aria-hidden="true"></span>
+        <span class="conn-status__label">Checking…</span>
+      </button>
+
+      <div class="titlebar__spacer"></div>
+
+      <div class="mode-toggle" role="tablist" aria-label="Editing mode">
+        <span class="mode-toggle__indicator"></span>
+        <button class="mode-toggle__option" role="tab" data-mode="single">Single</button>
+        <button class="mode-toggle__option" role="tab" data-mode="batch">Batch</button>
+      </div>
+
+      <div class="titlebar__spacer"></div>
+
+      <div class="titlebar__actions">
+        <button id="theme-toggle" class="icon-btn" aria-label="Toggle theme" title="Theme">
+          <i class="bi bi-circle-half"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Body row: left nav + view outlet -->
+    <div class="app-body">
+      <nav class="left-nav" aria-label="Primary">
+        <p class="nav-section-title">Workspace</p>
+        <button class="nav-btn is-active" data-route="edit" aria-current="page">
+          <span class="nav-btn__icon"><i class="bi bi-magic"></i></span>
+          <span class="nav-btn__label">Edit</span>
+          <span class="nav-btn__badge">AI</span>
+        </button>
+        <button class="nav-btn" data-route="library">
+          <span class="nav-btn__icon"><i class="bi bi-images"></i></span>
+          <span class="nav-btn__label">Library</span>
+        </button>
+        <button class="nav-btn" data-route="export">
+          <span class="nav-btn__icon"><i class="bi bi-box-arrow-up-right"></i></span>
+          <span class="nav-btn__label">Export</span>
+        </button>
+
+        <div class="nav-divider" aria-hidden="true"></div>
+
+        <p class="nav-section-title">System</p>
+        <button class="nav-btn" data-route="settings">
+          <span class="nav-btn__icon"><i class="bi bi-sliders2"></i></span>
+          <span class="nav-btn__label">Settings</span>
+        </button>
+        <button class="nav-btn" data-route="help">
+          <span class="nav-btn__icon"><i class="bi bi-question-circle"></i></span>
+          <span class="nav-btn__label">Help</span>
+        </button>
+      </nav>
+
+      <main class="main-content">
+        <div id="view-outlet" style="opacity: 1;"></div>
+      </main>
+    </div>
+
+    <!-- Agent rail (bottom) -->
+    <section class="agent-rail" aria-label="AI assistant">
+      <header class="agent-rail__header">
+        <span class="agent-rail__title">
+          <span class="agent-rail__title-dot" aria-hidden="true"></span>
+          Assistant
+        </span>
+        <span class="agent-rail__hint">Ready when you are. Press <kbd>/</kbd> for commands.</span>
+        <span class="agent-rail__spacer"></span>
+        <button id="agent-rail-toggle" class="icon-btn" aria-label="Collapse assistant">
+          <span class="chev" style="display:inline-flex; transition: transform var(--duration-normal) var(--ease-standard);">
+            <i class="bi bi-chevron-down"></i>
+          </span>
+        </button>
+      </header>
+      <div class="agent-rail__body">
+        <div class="agent-stream" aria-live="polite">
+          <p class="agent-stream__placeholder">
+            Drop an image and tell me what you want — “warm this up”, “lift the shadows”, “fix the cast”.
+            I’ll show every tool I call.
+          </p>
+        </div>
+        <div class="agent-prompt">
+          <textarea class="agent-prompt__input" rows="3" placeholder="Tell me what you want…" disabled></textarea>
+          <div class="agent-prompt__suggestions">
+            <span class="chip-glass">/analyze</span>
+            <span class="chip-glass">/recommend</span>
+            <span class="chip-glass">/compare</span>
+            <span class="chip-glass">/undo</span>
+          </div>
+          <button class="agent-prompt__send" disabled>Send</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

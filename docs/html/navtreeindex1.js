@@ -1,0 +1,20 @@
+var NAVTREEINDEX1 =
+{
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#ac3a2897d04bc1ec7cd2e8123fb7d16f2":[1,0,0,0,3,0,7],
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#ad473320d1f4a57f303dfb576b8b8dd38":[1,0,0,0,3,0,22],
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#addeb0879521dc7c6371aca19f6c3fead":[1,0,0,0,3,0,13],
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#af51f98541a6681f1249575a3465c5e44":[1,0,0,0,3,0,17],
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#af923749a40c1485712942fcbfcbc04d6":[1,0,0,0,3,0,0],
+"enumapp_1_1restful_1_1dto_1_1_image_issue.html#afe6b09341c969fdecb67a5290c0397e6":[1,0,0,0,3,0,9],
+"files.html":[2,0],
+"functions.html":[1,2,0],
+"functions_func.html":[1,2,1],
+"functions_vars.html":[1,2,2],
+"index.html":[],
+"interfaceapp_1_1restful_1_1agent_1_1_kuonix_ai_service.html":[1,0,0,0,0,2],
+"interfaceapp_1_1restful_1_1agent_1_1_kuonix_ai_service.html#af6b6c378834a1ab201a84b05146b1490":[1,0,0,0,0,2,0],
+"namespacemembers.html":[0,1,0],
+"namespacemembers_func.html":[0,1,1],
+"namespaces.html":[0,0],
+"pages.html":[]
+};

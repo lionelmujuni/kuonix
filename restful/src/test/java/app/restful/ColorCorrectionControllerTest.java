@@ -21,6 +21,7 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import app.restful.api.ColorCorrectionController;
 import app.restful.dto.ColorCorrectionMethod;
 import app.restful.dto.ColorCorrectionRequest;
 import app.restful.dto.ColorCorrectionResult;
@@ -531,6 +532,127 @@ public class ColorCorrectionControllerTest {
     // ========================================
     // EDGE CASES AND ERROR HANDLING
     // ========================================
+
+    // ========================================
+    // POST /color-correct/commit
+    // ========================================
+
+    @Test
+    void testCommit_GrayWorld_Success() {
+        Map<String, Object> params = new HashMap<>();
+        ColorCorrectionRequest request = new ColorCorrectionRequest(
+            "gray_world",
+            params,
+            testImagePath.toString(),
+            null
+        );
+
+        ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
+            "/color-correct/commit",
+            request,
+            ColorCorrectionResult.class
+        );
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        ColorCorrectionResult result = response.getBody();
+        assertTrue(result.success());
+        assertNotNull(result.outputPath());
+        // Working copies live in the hidden .working/ subfolder, not the workspace root
+        assertTrue(result.outputPath().replace('\\', '/').contains("/.working/"),
+                "Commit output should land in the .working/ folder, got: " + result.outputPath());
+        assertTrue(result.outputPath().contains("_step1_gray_world"));
+        assertTrue(Files.exists(Path.of(result.outputPath())));
+
+        // base64 returned so the frontend can update the viewer in one round-trip
+        assertNotNull(result.base64Image());
+        assertTrue(result.base64Image().startsWith("data:image/jpeg;base64,"));
+    }
+
+    @Test
+    void testCommit_ChainsStepNumber() {
+        Map<String, Object> params = new HashMap<>();
+
+        // First commit
+        ColorCorrectionRequest first = new ColorCorrectionRequest(
+            "gray_world", params, testImagePath.toString(), null
+        );
+        ResponseEntity<ColorCorrectionResult> firstResp = restTemplate.postForEntity(
+            "/color-correct/commit", first, ColorCorrectionResult.class
+        );
+        assertTrue(firstResp.getBody().success());
+        String firstPath = firstResp.getBody().outputPath();
+        assertTrue(firstPath.contains("_step1_"));
+
+        // Second commit chains on top — step counter should advance to step2
+        Map<String, Object> exposureParams = new HashMap<>();
+        exposureParams.put("gain", 1.2);
+        ColorCorrectionRequest second = new ColorCorrectionRequest(
+            "exposure", exposureParams, firstPath, null
+        );
+        ResponseEntity<ColorCorrectionResult> secondResp = restTemplate.postForEntity(
+            "/color-correct/commit", second, ColorCorrectionResult.class
+        );
+        assertTrue(secondResp.getBody().success());
+        assertTrue(secondResp.getBody().outputPath().contains("_step2_exposure"),
+                "Second commit should chain to step2, got: " + secondResp.getBody().outputPath());
+    }
+
+    @Test
+    void testCommit_InvalidPath() {
+        Map<String, Object> params = new HashMap<>();
+        ColorCorrectionRequest request = new ColorCorrectionRequest(
+            "gray_world",
+            params,
+            "/nonexistent/image.jpg",
+            null
+        );
+
+        ResponseEntity<ColorCorrectionResult> response = restTemplate.postForEntity(
+            "/color-correct/commit",
+            request,
+            ColorCorrectionResult.class
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertFalse(response.getBody().success());
+        assertTrue(response.getBody().message().toLowerCase().contains("not found"));
+    }
+
+    // ========================================
+    // GET /color-correct/camera-matrices
+    // ========================================
+
+    @Test
+    void testGetCameraMatrices_ReturnsPresetList() {
+        ResponseEntity<ColorCorrectionController.CameraMatrixPreset[]> response = restTemplate.getForEntity(
+            "/color-correct/camera-matrices",
+            ColorCorrectionController.CameraMatrixPreset[].class
+        );
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+
+        ColorCorrectionController.CameraMatrixPreset[] presets = response.getBody();
+        assertTrue(presets.length >= 2, "Should have at least the generic + one camera preset");
+
+        boolean hasGeneric = false;
+        boolean hasCanonR5 = false;
+        for (ColorCorrectionController.CameraMatrixPreset p : presets) {
+            assertNotNull(p.name(), "preset name must not be null");
+            assertNotNull(p.matrix(), "preset matrix must not be null");
+            assertEquals(3, p.matrix().length, "matrix must have 3 rows");
+            for (double[] row : p.matrix()) {
+                assertEquals(3, row.length, "each row must have 3 columns");
+            }
+            if ("Generic sRGB".equals(p.name())) hasGeneric = true;
+            if ("Canon EOS R5".equals(p.name())) hasCanonR5 = true;
+        }
+
+        assertTrue(hasGeneric, "Generic sRGB fallback must be present");
+        assertTrue(hasCanonR5, "Canon EOS R5 preset must be present");
+    }
 
     @Test
     void testPreview_AllMethods() {

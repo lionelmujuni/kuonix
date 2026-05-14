@@ -46,6 +46,11 @@ public class ImageClassifierServiceTest {
         thresholds.setSkinLineDeg(25.0);
         thresholds.setSkinLineTolDeg(12.0);
         thresholds.setSkinOverSatMin(0.70);
+        thresholds.setHazeDarkChannelMin(0.22);
+        thresholds.setCrushedShadowsBlackTailMinPct(0.10);
+        thresholds.setCrushedShadowsMedianMin(0.30);
+        thresholds.setClippedHighlightsWhiteTailMinPct(0.04);
+        thresholds.setClippedHighlightsMedianMax(0.70);
 
         classifier = new ImageClassifierService(thresholds);
     }
@@ -61,11 +66,29 @@ public class ImageClassifierServiceTest {
         double abDist, double castAngle, double noiseRatio,
         boolean hasSkin, double skinHueMean, double skinSatMean
     ) {
+        return createFeatures(width, height, medianY, meanY, p5Y, p95Y, blackPct, whitePct, stdY,
+                meanS, p95S, overRed, overGreen, overBlue, overCyan, overMagenta, overYellow,
+                labAMean, labBMean, abDist, castAngle, noiseRatio,
+                hasSkin, skinHueMean, skinSatMean,
+                0.0);
+    }
+
+    /** Variant that lets a test set {@code darkChannelMean} for haze tests. */
+    private ImageFeatures createFeatures(
+        int width, int height, double medianY, double meanY, double p5Y, double p95Y,
+        double blackPct, double whitePct, double stdY, double meanS, double p95S,
+        boolean overRed, boolean overGreen, boolean overBlue, boolean overCyan,
+        boolean overMagenta, boolean overYellow, double labAMean, double labBMean,
+        double abDist, double castAngle, double noiseRatio,
+        boolean hasSkin, double skinHueMean, double skinSatMean,
+        double darkChannelMean
+    ) {
         return new ImageFeatures(
             width, height, medianY, meanY, p5Y, p95Y, blackPct, whitePct, stdY,
             meanS, p95S, overRed, overGreen, overBlue, overCyan, overMagenta, overYellow,
             labAMean, labBMean, abDist, castAngle, noiseRatio,
-            hasSkin, skinHueMean, skinSatMean
+            hasSkin, skinHueMean, skinSatMean,
+            darkChannelMean
         );
     }
 
@@ -265,6 +288,75 @@ public class ImageClassifierServiceTest {
         );
 
         assertDoesNotThrow(() -> classifier.classify(features));
+    }
+
+    @Test
+    @DisplayName("Hazy image - dark channel above floor flags Hazy")
+    void testHazyImageFlagged() {
+        ImageFeatures features = createFeatures(
+            800, 600, 0.55, 0.55, 0.30, 0.85,
+            0.00, 0.01, 0.10,
+            0.10, 0.30,
+            false, false, false, false, false, false,
+            0.0, 0.0, 2.0, 0.0, 0.01,
+            false, 0.0, 0.0,
+            0.30                              // dark channel above 0.22 → Hazy
+        );
+        List<ImageIssue> issues = classifier.classify(features);
+        assertTrue(issues.contains(ImageIssue.Hazy));
+    }
+
+    @Test
+    @DisplayName("Clear image - low dark channel does NOT flag Hazy")
+    void testClearImageNotHazy() {
+        ImageFeatures features = createFeatures(
+            800, 600, 0.55, 0.55, 0.10, 0.90,
+            0.02, 0.02, 0.15,
+            0.30, 0.50,
+            false, false, false, false, false, false,
+            0.0, 0.0, 2.0, 0.0, 0.01,
+            false, 0.0, 0.0,
+            0.05
+        );
+        List<ImageIssue> issues = classifier.classify(features);
+        assertFalse(issues.contains(ImageIssue.Hazy));
+    }
+
+    @Test
+    @DisplayName("Crushed shadows - high blackPct with normal median flags Crushed_Shadows")
+    void testCrushedShadowsFlagged() {
+        ImageFeatures features = createFeatures(
+            800, 600, 0.50, 0.50, 0.02, 0.85,  // median normal, p5Y near 0
+            0.15, 0.02, 0.15,                   // blackPct above 0.10 floor
+            0.30, 0.50,
+            false, false, false, false, false, false,
+            0.0, 0.0, 2.0, 0.0, 0.01,
+            false, 0.0, 0.0,
+            0.05
+        );
+        List<ImageIssue> issues = classifier.classify(features);
+        assertTrue(issues.contains(ImageIssue.Crushed_Shadows));
+        // Critically, this is NOT classed as underexposed (median is fine).
+        assertFalse(issues.contains(ImageIssue.Needs_Exposure_Increase),
+                "Crushed shadows must be distinct from underexposure");
+    }
+
+    @Test
+    @DisplayName("Clipped highlights - high whitePct with normal median flags Clipped_Highlights")
+    void testClippedHighlightsFlagged() {
+        ImageFeatures features = createFeatures(
+            800, 600, 0.55, 0.55, 0.10, 0.99,  // median normal, p95Y near 1
+            0.02, 0.06, 0.15,                   // whitePct above 0.04 floor
+            0.30, 0.50,
+            false, false, false, false, false, false,
+            0.0, 0.0, 2.0, 0.0, 0.01,
+            false, 0.0, 0.0,
+            0.05
+        );
+        List<ImageIssue> issues = classifier.classify(features);
+        assertTrue(issues.contains(ImageIssue.Clipped_Highlights));
+        assertFalse(issues.contains(ImageIssue.Needs_Exposure_Decrease),
+                "Clipped highlights must be distinct from overexposure");
     }
 
     @Test

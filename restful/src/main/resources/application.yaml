@@ -46,3 +46,14 @@ classifier:
     skinLineDeg: 25.0
     skinLineTolDeg: 12.0
     skinOverSatMin: 0.70
+    # Phase 5 detectors --------------------------------------------------------
+    # Haze: dark-channel mean above this means meaningful haze veil.
+    hazeDarkChannelMin: 0.22
+    # Crushed shadows: blackPct >= floor AND medianY >= floor
+    # (distinct from underexposure — image overall is normal but shadows are clipped).
+    crushedShadowsBlackTailMinPct: 0.10
+    crushedShadowsMedianMin: 0.30
+    # Clipped highlights: whitePct >= floor AND medianY <= ceiling
+    # (distinct from overexposure — image overall is normal but highlights are blown).
+    clippedHighlightsWhiteTailMinPct: 0.04
+    clippedHighlightsMedianMax: 0.70

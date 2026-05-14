@@ -2,7 +2,6 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '3.5.7'
 	id 'io.spring.dependency-management' version '1.1.7'
-	id 'org.asciidoctor.jvm.convert' version '4.0.4'
 }
 
 group = 'app'
@@ -19,10 +18,6 @@ repositories {
 	mavenCentral()
 }
 
-ext {
-	set('snippetsDir', file("build/generated-snippets"))
-}
-
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -30,20 +25,18 @@ dependencies {
 	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
 	implementation 'commons-codec:commons-codec:1.16.0'
 
-	// LangChain4j agent layer (Ollama Cloud)
-	implementation 'dev.langchain4j:langchain4j-spring-boot-starter:0.36.0'
-	implementation 'dev.langchain4j:langchain4j-ollama-spring-boot-starter:0.36.0'
+	// LangChain4j agent layer (Ollama Cloud) — plain libs, beans created in DynamicOllamaConfig
+	implementation 'dev.langchain4j:langchain4j:1.13.0'
+	implementation 'dev.langchain4j:langchain4j-ollama:1.13.0'
 
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testImplementation 'org.junit.jupiter:junit-jupiter'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
 }
 
 tasks.named('test') {
-	outputs.dir snippetsDir
 	useJUnitPlatform()
 	testLogging {
 		events "passed", "failed", "skipped"
@@ -70,9 +63,4 @@ task integrationTest(type: Test) {
     testClassesDirs = sourceSets.integrationTest.output.classesDirs
     classpath = sourceSets.integrationTest.runtimeClasspath
     useJUnitPlatform()
-}
-
-tasks.named('asciidoctor') {
-	inputs.dir snippetsDir
-	dependsOn test
 }

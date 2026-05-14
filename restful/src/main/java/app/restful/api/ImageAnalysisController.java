@@ -42,12 +42,15 @@ public class ImageAnalysisController {
     private final ImageAnalysisService analysis;
     private final ImageClassifierService classifier;
     private final GroupingService grouping;
+    private final java.util.concurrent.Executor analysisExecutor;
 
-    public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis, ImageClassifierService classifier, GroupingService grouping) {
+    public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis, ImageClassifierService classifier, GroupingService grouping,
+            @org.springframework.beans.factory.annotation.Qualifier("analysisExecutor") java.util.concurrent.Executor analysisExecutor) {
         this.storage = storage;
         this.analysis = analysis;
         this.classifier = classifier;
         this.grouping = grouping;
+        this.analysisExecutor = analysisExecutor;
     }
 
     // Upload images and return absolute paths (renderer already expects this)
@@ -73,7 +76,7 @@ public class ImageAnalysisController {
     public SseEmitter classifyWithProgress(@RequestBody ImageClassifyRequest req) {
         SseEmitter emitter = new SseEmitter(300000L); // 5 minute timeout
         
-        new Thread(() -> {
+        analysisExecutor.execute(() -> {
             try {
                 boolean enableSkin = req.enableSkin();
                 List<ImageClassifyResult> results = new ArrayList<>();
@@ -125,7 +128,7 @@ public class ImageAnalysisController {
                 }
                 emitter.completeWithError(e);
             }
-        }).start();
+        });
         
         return emitter;
     }

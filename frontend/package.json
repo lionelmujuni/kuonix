@@ -5,7 +5,10 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --enable-logging"
+    "dev": "electron . --enable-logging",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [
     "image",
@@ -18,10 +21,14 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^29.4.6"
+    "@vitest/coverage-v8": "^2.1.8",
+    "electron": "^29.4.6",
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.8"
   },
   "dependencies": {
     "electron-sudo": "^4.0.12",
+    "gsap": "^3.15.0",
     "sudo-prompt": "^9.2.1",
     "tree-kill": "^1.2.2"
   }

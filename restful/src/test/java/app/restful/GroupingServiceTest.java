@@ -60,7 +60,8 @@ public class GroupingServiceTest {
         ImageFeatures features = new ImageFeatures(
             800, 600, 0.50, 0.50, 0.10, 0.90, 0.02, 0.02, 0.15,
             0.30, 0.50, false, false, false, false, false, false,
-            0.0, 0.0, 2.0, 0.0, 0.01, false, 0.0, 0.0
+            0.0, 0.0, 2.0, 0.0, 0.01, false, 0.0, 0.0,
+            0.0
         );
         return new ImageClassifyResult(imagePath.toString(), features, List.of(issues));
     }

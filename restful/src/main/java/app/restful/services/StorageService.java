@@ -79,6 +79,21 @@ public class StorageService {
     }
 
     /**
+     * Working-copy directory for committed intermediate correction steps.
+     * Hidden from the user-visible workspace root so chained edits don't
+     * clutter the final-output folder.
+     */
+    public Path getWorkingDir() {
+        Path workingDir = workspaceDir.resolve(".working");
+        try {
+            Files.createDirectories(workingDir);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create working directory: " + workingDir, e);
+        }
+        return workingDir;
+    }
+
+    /**
      * Clean up old files from workspace (optional maintenance).
      * 
      * @param daysOld Delete files older than this many days
