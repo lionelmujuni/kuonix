@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld(
      * @param {string} targetPath - A string of one or more quoted arguments to pass to the application.
      * @returns {Promise<{success: boolean, error?: string}>} - A promise that resolves with the result.
      */
-    launchApp: (appPath, args) => ipcRenderer.invoke("launch-app", appPath, args),
+    launchApp: (appPath, args, useAdmin) => ipcRenderer.invoke("launch-app", appPath, args, useAdmin),
     searchExecutable: (filename) => ipcRenderer.invoke('search-executable', filename),
     searchExecutableAdmin: (filename) => ipcRenderer.invoke('search-executable-admin', filename),
     // Reference image selection API (Color Lab)

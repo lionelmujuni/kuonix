@@ -1,3 +1,12 @@
+import { showToast, removeToast }                              from './src/toast.js';
+import { ButtonLoader }                                       from './src/uiState.js';
+import { initLibrary, saveLibrary, loadLibrary,
+         regenerateImageURLs, waitForBackend }                from './src/library.js';
+
+// Module-level flag — set to true once waitForBackend resolves successfully.
+// Used as a fast guard in action handlers so they don't need to re-poll.
+let _backendReady = false;
+
 window.addEventListener('DOMContentLoaded', () => {
   // Element references
   const topnav = document.getElementById('main-nav');
@@ -110,235 +119,29 @@ window.addEventListener('DOMContentLoaded', () => {
   const LIBRARY_KEY = "persistentLibrary";
   const LIBRARY_SCROLL_KEY = "libraryScrollPosition";
 
-  // Save library metadata only (no Base64) to localStorage
-  // Images are stored on backend in persistent workspace directory
-  function saveLibrary() {
-    const saveData = libraryImages.map(img => ({
-      id: img.id,
-      name: img.name,
-      size: img.size,
-      issues: img.issues, // Persist analysis results
-      path: img.path, // Persist backend file path for Color Correction Lab
-      aspectRatio: img.aspectRatio, // Cache calculated aspect ratio
-      // Store only metadata - no Base64 to avoid localStorage size limits
-      // Base64 is kept in memory for current session only
-    }));
-    localStorage.setItem(LIBRARY_KEY, JSON.stringify(saveData));
-    console.log(`Saved library metadata for ${saveData.length} images (${JSON.stringify(saveData).length} bytes)`);
-  }
-
-  // Load library metadata (URLs must be recreated from files on disk)
-  async function loadLibrary() {
-    const raw = localStorage.getItem(LIBRARY_KEY);
-    if (!raw) return;
-
-    try {
-      const parsed = JSON.parse(raw);
-      libraryImages.length = 0;
-
-      // Restore metadata (URLs regenerated from backend)
-      parsed.forEach(savedImg => {
-        libraryImages.push({
-          id: savedImg.id,
-          name: savedImg.name,
-          size: savedImg.size,
-          issues: savedImg.issues || [],
-          path: savedImg.path, // Backend workspace path
-          aspectRatio: savedImg.aspectRatio || 1.5,
-          url: null, // Regenerated from backend
-          base64: null, // Memory-only, not persisted
-          file: null // File handle lost after reload
-        });
-      });
-      
-      console.log(`Library loaded: ${libraryImages.length} images from metadata`);
-      
-      // Wait for backend, then regenerate URLs
-      if (libraryImages.length > 0) {
-        const backendReady = await waitForBackend();
-        if (backendReady) {
-          await regenerateImageURLs();
-        } else {
-          showToast('Backend not available - library images may not display', 'warning', 6000);
-        }
-      }
-
-    } catch (err) {
-      console.error("Failed to load library:", err);
-    }
-  }
-
-  // Regenerate object URLs from backend workspace files with retry logic
-  async function regenerateImageURLs(retryCount = 0, maxRetries = 3) {
-    const imagesWithPaths = libraryImages.filter(img => img.path && !img.url);
-    if (imagesWithPaths.length === 0) return;
-    
-    try {
-      const response = await fetch('http://localhost:8081/images/get-urls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paths: imagesWithPaths.map(img => img.path)
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.message || 'URL regeneration failed');
-      }
-      
-      // Update library images with fresh data URLs
-      data.images.forEach((urlData, index) => {
-        const img = imagesWithPaths[index];
-        if (urlData.exists && urlData.dataUrl) {
-          img.url = urlData.dataUrl;
-          img.base64 = urlData.dataUrl; // Store Base64 for CC Lab
-        } else {
-          console.warn(`Image not found in workspace: ${img.name}`);
-        }
-      });
-      
-      // Re-render library grid if visible
-      if (libraryView.style.display !== 'none') {
-        displayLibraryGrid(true);
-        updateLibraryEmptyState();
-      }
-      
-      console.log(`✓ Regenerated URLs for ${data.images.filter(i => i.exists).length} images`);
-      
-    } catch (error) {
-      console.error(`Failed to regenerate image URLs (attempt ${retryCount + 1}/${maxRetries + 1}):`, error);
-      
-      // Retry with exponential backoff
-      if (retryCount < maxRetries) {
-        const delayMs = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
-        console.log(`Retrying in ${delayMs}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        return regenerateImageURLs(retryCount + 1, maxRetries);
-      }
-      
-      showToast('Failed to load library images - backend may not be running', 'error');
-    }
-  }
-
-  // ============================
-  // Backend Health Check
-  // ============================
-  
-  /**
-   * Wait for backend to be ready before loading library
-   * @param {number} maxAttempts - Maximum number of health check attempts
-   * @param {number} delayMs - Delay between attempts in milliseconds
-   * @returns {Promise<boolean>} - True if backend is ready, false otherwise
-   */
-  async function waitForBackend(maxAttempts = 10, delayMs = 1000) {
-    for (let i = 0; i < maxAttempts; i++) {
-      try {
-        const response = await fetch('http://localhost:8081/color-correct/methods', { 
-          method: 'GET',
-          signal: AbortSignal.timeout(2000) // 2s timeout per attempt
-        });
-        if (response.ok) {
-          console.log('✓ Backend ready');
-          return true;
-        }
-      } catch (err) {
-        console.log(`Backend not ready, attempt ${i + 1}/${maxAttempts}...`);
-      }
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-    console.warn('Backend health check failed after max attempts');
-    return false;
-  }
+  // Wire module-level library state before loading persisted data
+  initLibrary({ libraryImages, libraryView, emptyState, displayLibraryGrid: (force) => displayLibraryGrid(force) });
 
   // Initialize library loading with backend health check
   (async () => {
-    await loadLibrary();
-  })();
+    // Disable backend-dependent buttons until the Spring Boot backend is ready
+    const backendBtns = [uploadBtn, analyzeBtn, addMoreBtn, exportBtn, colorLabBtn].filter(Boolean);
+    backendBtns.forEach(btn => btn.setAttribute('disabled', 'disabled'));
 
-  // ============================
-  // Toast Notification System
-  // ============================
-  
-  /**
-   * Show a non-blocking glassmorphism toast notification
-   * @param {string} message - The message to display
-   * @param {string} type - 'success', 'error', or 'info' (default)
-   * @param {number} duration - Duration in milliseconds (default 4000)
-   */
-  function showToast(message, type = 'info', duration = 4000) {
-    // Create toast container if it doesn't exist
-    let toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-      toastContainer = document.createElement('div');
-      toastContainer.className = 'toast-container';
-      document.body.appendChild(toastContainer);
-    }
+    const startingToast = showToast('Starting backend server, please wait…', 'info', 60000);
 
-    // Create toast element
-    const toast = document.createElement('div');
-    toast.className = `toast toast--${type}`;
-    
-    // Add icon based on type
-    let icon = '';
-    if (type === 'success') {
-      icon = '<i class="bi bi-check-circle-fill"></i>';
-    } else if (type === 'error') {
-      icon = '<i class="bi bi-exclamation-circle-fill"></i>';
+    const ready = await waitForBackend(30, 1000);
+
+    removeToast(startingToast);
+    _backendReady = ready;
+    backendBtns.forEach(btn => btn.removeAttribute('disabled'));
+
+    if (ready) {
+      await loadLibrary();
     } else {
-      icon = '<i class="bi bi-info-circle-fill"></i>';
+      showToast('Backend failed to start. Please restart the app.', 'error', 10000);
     }
-    
-    toast.innerHTML = `
-      <div class="toast__icon">${icon}</div>
-      <div class="toast__message">${message}</div>
-      <button class="toast__close" aria-label="Close">
-        <i class="bi bi-x"></i>
-      </button>
-    `;
-    
-    // Add to container
-    toastContainer.appendChild(toast);
-    
-    // Trigger animation
-    requestAnimationFrame(() => {
-      toast.classList.add('toast--show');
-    });
-    
-    // Auto-remove after duration
-    const autoRemove = setTimeout(() => {
-      removeToast(toast);
-    }, duration);
-    
-    // Close button handler
-    const closeBtn = toast.querySelector('.toast__close');
-    closeBtn.addEventListener('click', () => {
-      clearTimeout(autoRemove);
-      removeToast(toast);
-    });
-    
-    return toast;
-  }
-
-  /**
-   * Remove a toast with animation
-   * @param {HTMLElement} toast - The toast element to remove
-   */
-  function removeToast(toast) {
-    toast.classList.remove('toast--show');
-    toast.classList.add('toast--hide');
-    
-    setTimeout(() => {
-      if (toast.parentNode) {
-        toast.parentNode.removeChild(toast);
-      }
-    }, 300); // Match CSS animation duration
-  }
+  })();
 
   let uploadedImages = [];
 
@@ -378,79 +181,6 @@ window.addEventListener('DOMContentLoaded', () => {
       updateNavActiveState(colorLabBtn);
     });
   }
-
-  /**
-   * ButtonLoader - Reusable utility for managing button loading states
-   * 
-   * This utility provides a consistent UX pattern for async operations by:
-   * - Disabling buttons during operations to prevent double-clicks
-   * - Showing visual feedback with loading text and animated icon
-   * - Automatically restoring original state after completion or error
-   * 
-   * Usage Examples:
-   * 
-   * 1. Basic usage with wrap():
-   *    await ButtonLoader.wrap(myButton, 'Saving...', async () => {
-   *      await saveData();
-   *    });
-   * 
-   * 2. Manual control:
-   *    const state = ButtonLoader.start(myButton, 'Processing...');
-   *    try {
-   *      await doSomething();
-   *    } finally {
-   *      ButtonLoader.stop(myButton, state);
-   *    }
-   */
-  const ButtonLoader = {
-    /**
-     * Sets a button to loading state
-     * @param {HTMLElement} button - The button element
-     * @param {string} loadingText - Text to display during loading
-     * @returns {Object} - Object with original state to restore later
-     */
-    start(button, loadingText = 'Loading...') {
-      const originalState = {
-        text: button.innerHTML,
-        disabled: button.disabled,
-        classList: [...button.classList]
-      };
-      
-      button.disabled = true;
-      button.classList.add('loading');
-      button.innerHTML = `<i class="bi bi-hourglass-split"></i> ${loadingText}`;
-      
-      return originalState;
-    },
-
-    /**
-     * Restores button to original state
-     * @param {HTMLElement} button - The button element
-     * @param {Object} originalState - State returned from start()
-     */
-    stop(button, originalState) {
-      button.innerHTML = originalState.text;
-      button.disabled = originalState.disabled;
-      button.classList.remove('loading');
-    },
-
-    /**
-     * Wraps an async operation with loading state management
-     * Automatically handles errors and ensures state restoration
-     * @param {HTMLElement} button - The button element
-     * @param {string} loadingText - Text to display during loading
-     * @param {Function} asyncFn - Async function to execute
-     * @returns {Promise} - Result of asyncFn
-     */
-    async wrap(button, loadingText, asyncFn) {
-      const originalState = this.start(button, loadingText);
-      try {
-        return await asyncFn();
-      } finally {
-        this.stop(button, originalState);
-      }
-    }
-  };
 
   // Show/hide Clear All button
   function updateClearAllButton() {
@@ -1323,6 +1053,10 @@ window.addEventListener('DOMContentLoaded', () => {
   let currentFilter = 'all'; // For filtering images by issue type
 
   analyzeBtn.addEventListener('click', async () => {
+    if (!_backendReady) {
+      showToast('Backend is still starting up, please wait a moment…', 'warning', 5000);
+      return;
+    }
     if (uploadedImages.length === 0) {
       showToast('Please upload images first.', 'error');
       return;
@@ -2030,7 +1764,10 @@ window.addEventListener('DOMContentLoaded', () => {
         if (img) URL.revokeObjectURL(img.url);
       });
       
-      libraryImages = libraryImages.filter(img => !selectedLibraryImages.includes(img.id));
+      const idsToDelete = new Set(selectedLibraryImages);
+      for (let i = libraryImages.length - 1; i >= 0; i--) {
+        if (idsToDelete.has(libraryImages[i].id)) libraryImages.splice(i, 1);
+      }
       uploadedImages = uploadedImages.filter(img => !selectedLibraryImages.includes(img.id));
       
       selectedLibraryImages = [];
@@ -2201,20 +1938,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Send images to Spring Boot, get back absolute disk paths
   async function fetchImagePaths(images) {
-    const form = new FormData();
-    images.forEach(img => form.append("files", img.file));
-
-    const res = await fetch("http://localhost:8081/images/upload", {
-      method: "POST",
-      body: form
-    });
-
-    const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.message || "Image upload failed");
+    const paths = images.map(img => img.serverPath).filter(Boolean);
+    if (paths.length < images.length) {
+      throw new Error('Some images have no server path. Please re-analyze before exporting.');
     }
-
-    return data.paths;
+    return paths;
   }
 
   exportBtn.addEventListener("click", async () => {
@@ -2275,7 +2003,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const imagePaths = await fetchImagePaths(imagesToExport);
 
         console.log("Launching export application...");
-        const result = await window.api.launchApp(exportAppPath, imagePaths);
+        const result = await window.api.launchApp(exportAppPath, imagePaths, exportUseAdmin);
 
         console.log("Export success:", result);
         showToast(
@@ -3213,6 +2941,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Before/After toggle
   ccBeforeAfterToggle.addEventListener('click', () => {
+    // Check if a correction has been applied
+    const hasCorrection = ccCorrectionResults[ccCurrentImagePath]?.base64;
+    if (!hasCorrection) {
+      showToast('No correction applied yet. Select an algorithm first.', 'info');
+      return;
+    }
+    
     ccShowBefore = !ccShowBefore;
     
     if (ccShowBefore) {
@@ -3419,7 +3154,8 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // Update navigation button states and counter
   function updateNavigationState() {
-    if (ccSessionImages.length <= 1) {
+    // Show nav bar when at least 1 image is loaded (so user can remove it)
+    if (ccSessionImages.length === 0) {
       ccNavigationBar.style.display = 'none';
       return;
     }
@@ -3427,6 +3163,12 @@ window.addEventListener('DOMContentLoaded', () => {
     ccNavigationBar.style.display = 'flex';
     ccCurrentImageNum.textContent = ccCurrentImageIndex + 1;
     ccTotalImages.textContent = ccSessionImages.length;
+    
+    // Hide prev/next and counter when only 1 image
+    const hasMultiple = ccSessionImages.length > 1;
+    ccPrevImageBtn.style.display = hasMultiple ? 'flex' : 'none';
+    ccNextImageBtn.style.display = hasMultiple ? 'flex' : 'none';
+    ccCurrentImageNum.parentElement.style.display = hasMultiple ? 'block' : 'none';
     
     ccPrevImageBtn.disabled = ccCurrentImageIndex === 0;
     ccNextImageBtn.disabled = ccCurrentImageIndex === ccSessionImages.length - 1;
@@ -3473,7 +3215,8 @@ window.addEventListener('DOMContentLoaded', () => {
       updateMethodControls(ccCurrentMethod);
       updateTheoryContent(ccCurrentMethod);
     } else {
-      // No correction yet, apply default correction only if method is selected
+      // No correction yet - initialize corrected image to original and hide it
+      ccCorrectedImage.src = img.url || img.base64;
       ccCorrectedImage.style.display = 'none';
       
       if (ccCurrentMethod) {

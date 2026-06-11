@@ -5,7 +5,52 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --enable-logging"
+    "dev": "electron . --enable-logging",
+    "test": "vitest run",
+    "package": "electron-builder",
+    "package:win": "electron-builder --win",
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.kuonix.app",
+    "productName": "Kuonix",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "**/*",
+      "kuonix.jar",
+      "!jre/**",
+      "!tests/**",
+      "!*.test.js",
+      "!vitest.config.js",
+      "!jsconfig.json"
+    ],
+    "asarUnpack": [
+      "kuonix.jar"
+    ],
+    "extraResources": [
+      {
+        "from": "jre/",
+        "to": "jre/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icons/appicon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icons/appicon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icons/appicon.png"
+    }
   },
   "keywords": [
     "image",
@@ -18,7 +63,12 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^29.4.6"
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2",
+    "jsdom": "^29.0.2",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.35.0",
+    "vitest": "^4.1.5"
   },
   "dependencies": {
     "electron-sudo": "^4.0.12",

@@ -161,6 +161,9 @@
   --accent-border: rgba(59, 130, 246, 0.2);
   --accent-shadow: rgba(59, 130, 246, 0.15);
   --fullscreen-bg: rgba(239, 246, 255, 0.95); /* Light blue tint */
+
+  /* Color Correction Lab canvas background */
+  --cc-canvas-bg: #e8e8e8; /* soft neutral gray for light mode */
 }
 
 /* ---- Dark mode overrides (prefers-color-scheme) ---- */
@@ -222,6 +225,9 @@
     --accent-border: rgba(119, 124, 124, 0.25);
     --accent-shadow: rgba(119, 124, 124, 0.2);
     --fullscreen-bg: rgba(20, 22, 22, 0.95); /* Dark grey tint */
+
+    /* Color Correction Lab canvas background */
+    --cc-canvas-bg: #1d1d1d; /* deep dark, image pops */
   }
 }
 
@@ -268,6 +274,9 @@
 
   /* Accent color for dark mode */
   --accent-color: rgba(119, 124, 124, 1);
+
+  /* Color Correction Lab canvas background */
+  --cc-canvas-bg: #1d1d1d;
   --accent-color-rgb: 119, 124, 124;
   --accent-subtle: rgba(119, 124, 124, 0.1);
   --accent-border: rgba(119, 124, 124, 0.25);
@@ -1686,7 +1695,6 @@ select.form-control{
   margin: 0 calc(-1 * var(--space-16));
   padding: var(--space-16);
   position: relative;
-  min-height: 100vh;
 }
 
 .library-header{ display:flex; justify-content:space-between; margin-bottom:var(--space-32); padding-bottom:var(--space-16); border-bottom:2px solid var(--accent-border); flex-wrap:wrap; gap:var(--space-16); }
@@ -2048,32 +2056,60 @@ select.form-control{
    Color Correction Lab Styles
    ============================ */
 
-/* Color Correction Lab - Multi-image navigation */
+/* Color Correction Lab - Multi-image navigation (floating overlay) */
 .cc-navigation-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-  padding: var(--space-12);
-  margin-bottom: var(--space-16);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(var(--accent-color-rgb), 0.08);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 2px 8px var(--accent-shadow);
+  gap: 12px;
+  padding: 6px 14px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  z-index: 10;
+  pointer-events: all;
+  white-space: nowrap;
+}
+
+.cc-nav-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 16px;
+  opacity: 0.8;
+  transition: opacity 180ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-nav-btn:hover {
+  opacity: 1;
+}
+
+.cc-nav-btn--danger:hover {
+  color: #ff6b6b;
 }
 
 .cc-image-counter {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  padding: 0 var(--space-12);
+  color: #fff;
+  padding: 0 var(--space-8);
   white-space: nowrap;
 }
 
 .cc-image-counter span {
-  color: var(--accent-color);
+  color: #fff;
   font-weight: var(--font-weight-bold);
 }
 
@@ -2101,45 +2137,227 @@ select.form-control{
   margin-bottom: var(--space-24);
 }
 
+/* ============================
+   Color Correction Lab Styles
+   ============================ */
+
+/* Remove gaps above the Color Lab view */
+.cc-color-lab-view,
+.cc-preview-view,
+.cc-main-content {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
 /* Color Correction Lab main container */
 .color-correction-view {
   display: grid;
-  grid-template-columns: 52px 1fr 280px;
-  gap: 0;
-  /* Edge-to-edge: negate container padding */
-  width: calc(100% + var(--space-32));
-  max-width: none;
-  margin: 0 calc(-1 * var(--space-16));
-  padding: 0;
-  /* Full height layout - all columns same height */
-  min-height: calc(100vh - 120px);
+  grid-template-rows: 44px 1fr;
+  grid-template-columns: 44px 1fr 280px;
+  grid-template-areas:
+    "topbar  topbar  topbar"
+    "toolbar canvas  panels";
+  width: 100%;
   height: calc(100vh - 120px);
-  position: relative;
+  min-height: 0;
   overflow: hidden;
-  padding-top: 10vh;
+  padding: 0 !important;
+  margin: 0;
+  background: #1a1a1a;
+}
+
+/* Top bar - spans all columns */
+.cc-topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 44px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.cc-topbar .cc-topbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cc-topbar-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Filename — muted, not competing */
+.cc-topbar-filename {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Back to Grid — ghost style */
+.cc-btn-back {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+.cc-btn-back:hover {
+  color: var(--color-text);
+  background: var(--color-surface-offset);
+}
+
+/* Before/After — segmented pill style */
+.cc-btn-before-after {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-surface-offset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.cc-btn-before-after:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-faint);
+}
+.cc-btn-before-after.active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-highlight);
+}
+
+/* Reset — minimal ghost */
+.cc-btn-reset {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.cc-btn-reset:hover {
+  color: var(--color-text);
+  background: var(--color-surface-offset);
+  border-color: var(--color-border);
+}
+
+/* Save — solid primary, the ONE action */
+.cc-btn-save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 150ms ease;
+  white-space: nowrap;
+}
+.cc-btn-save:hover {
+  background: var(--color-primary-hover);
+}
+
+/* Left toolbar */
+.cc-left-toolbar {
+  grid-area: toolbar;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 2px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;      /* scroll if icons don't fit */
+  overflow-x: hidden;
+  height: 100%;          /* constrain to grid cell height */
+  min-height: 0;         /* critical: lets flex shrink */
+}
+
+/* Canvas area */
+.cc-canvas-area {
+  grid-area: canvas;
+  position: relative;
+  background: var(--cc-canvas-bg);
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+/* Right panel */
+.cc-right-panel {
+  grid-area: panels;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  padding: var(--space-16) var(--space-12);
 }
 
 /* ============================
-   Color Lab Toolbar (Left Panel)
+   Color Lab Toolbar (Left Panel) - Legacy support
    ============================ */
 .cc-toolbar {
-  border: none;
-  border-right: 1px solid var(--color-card-border);
-  border-radius: 0;
-  padding: var(--space-16) var(--space-4);
-  box-shadow: none;
-  backdrop-filter: blur(12px) saturate(110%);
+  grid-area: toolbar;
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
-  /* Full height, left edge */
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
-  height: 100%;
-  position: relative;
-  flex-shrink: 0;
-  z-index: 10;
+  align-items: center;
+  padding: 8px 0;
+  gap: 2px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  overflow-y: auto;      /* scroll if icons don't fit */
+  overflow-x: hidden;
+  height: 100%;          /* constrain to grid cell height */
+  min-height: 0;         /* critical: lets flex shrink */
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
 }
 
 /* Hide toolbar titles in compact mode */
@@ -2154,27 +2372,53 @@ select.form-control{
 }
 
 .cc-toolbar-divider {
+  width: 60%;
   height: 1px;
-  background: var(--color-border);
-  margin: var(--space-4) 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  margin: 4px 0;         /* small margin */
+  flex-shrink: 0;
 }
 
+/* Also style hr inside toolbar */
+.cc-left-toolbar hr,
+.cc-toolbar hr {
+  width: 60%;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 4px 0;
+  flex-shrink: 0;
+}
+
+/* Toolbar icon buttons — cleaner styling */
+.cc-toolbar button,
+.cc-toolbar .cc-tool-btn,
 .cc-tool-btn {
-  position: relative;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  margin: 0 auto;
   background: transparent;
   border: none;
-  border-radius: var(--radius-base);
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  color: var(--color-text-faint);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-standard);
-  font-size: 20px;
+  transition: background 150ms ease, color 150ms ease;
+  flex-shrink: 0;
+  position: relative;
+  font-size: 18px;
+}
+.cc-toolbar button:hover,
+.cc-tool-btn:hover {
+  background: var(--color-surface-offset);
+  color: var(--color-text);
+}
+.cc-toolbar button.active,
+.cc-tool-btn.active {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
 }
 
 /* Toolbar button hover tooltip */
@@ -2204,16 +2448,13 @@ select.form-control{
   transition-delay: 0.3s;
 }
 
-.cc-tool-btn:hover {
-  background: var(--accent-subtle);
-  border-color: var(--accent-border);
-  color: var(--accent-color);
-}
-
-.cc-tool-btn.active {
-  background: var(--accent-color);
-  color: #fff;
-  border-color: var(--accent-color);
+/* Divider between tool groups */
+.cc-toolbar-separator {
+  width: 20px;
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px auto;
+  flex-shrink: 0;
 }
 
 /* ============================
@@ -2254,10 +2495,14 @@ select.form-control{
 
 /* Grid View */
 .cc-grid-view {
-  flex: 1;
-  /* Stability: prevent collapsing */
-  min-height: 400px;
-  overflow-y: scroll;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  background: var(--color-background);
+  padding: var(--space-16);
 }
 
 .cc-images-grid {
@@ -2461,21 +2706,11 @@ select.form-control{
 
 /* Preview Panel (Center) */
 .cc-preview-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-card-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-20);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(12px) saturate(110%);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-16);
-  /* Constrain height to prevent overflow */
+  width: 100%;
   height: 100%;
-  max-height: 100%;
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
+  background: var(--cc-canvas-bg);
+  display: block;
+  overflow: visible;
 }
 
 .cc-preview-header {
@@ -2499,14 +2734,11 @@ select.form-control{
 
 .cc-preview-container {
   position: relative;
-  flex: 1;
-  min-height: 0; /* Allow shrinking to fit */
-  background: var(--color-background);
+  width: 100%;
+  height: calc(100vh - 160px);
+  background: #1d1d1d;
   border-radius: var(--radius-md);
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .cc-no-image {
@@ -2518,15 +2750,15 @@ select.form-control{
   color: var(--color-text-secondary);
 }
 
-/* Image container uses CSS Grid for stacking original and corrected images */
+/* Image container fills the preview area */
 .cc-image-container {
-  display: grid;
-  place-items: center;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  overflow: hidden;
+  overflow: visible;
+  border-radius: 0;
 }
 
 .cc-image-container img {
@@ -2535,20 +2767,31 @@ select.form-control{
   object-fit: contain;
 }
 
-/* Both images stack in the same grid cell */
 .cc-preview-image {
-  grid-area: 1 / 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   max-width: 100%;
   max-height: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  border-radius: var(--radius-sm);
+  border-radius: 0;      /* remove all rounding */
 }
 
-/* Corrected image stacks on top, no absolute positioning needed */
+/* Corrected image stacks over original via absolute positioning */
 .cc-preview-image.cc-corrected {
-  /* Inherits grid-area: 1 / 1 from .cc-preview-image */
-  /* z-index ensures it's on top when visible */
-  z-index: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 0;      /* remove all rounding */
 }
 
 .cc-split-overlay {
@@ -2598,15 +2841,15 @@ select.form-control{
   height: 52px;
 }
 
-/* Controls Panel (Right) */
+/* Controls Panel (Right) - Legacy support */
 .cc-controls-panel {
+  grid-area: panels;
+  background: var(--color-surface);
   border: none;
-  border-left: 1px solid var(--color-card-border);
+  border-left: 1px solid var(--color-border);
   border-radius: 0;
-  padding: var(--space-16) var(--space-12);
+  padding: 0;
   box-shadow: none;
-  backdrop-filter: blur(12px) saturate(110%);
-  /* Full height, right edge */
   height: 100%;
   max-height: 100%;
   overflow-y: auto;
@@ -2617,59 +2860,180 @@ select.form-control{
   flex-shrink: 0;
 }
 
+/* "Controls" heading */
+.cc-controls-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Algorithm section */
+.cc-algorithm-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cc-algorithm-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-bottom: 8px;
+}
+
+/* Algorithm dropdown */
+.cc-algorithm-select,
+#ccAlgorithmSelect {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--color-surface-offset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  appearance: none;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+.cc-algorithm-select:hover,
+#ccAlgorithmSelect:hover {
+  border-color: var(--color-text-faint);
+}
+.cc-algorithm-select:focus,
+#ccAlgorithmSelect:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Collapsible section headers */
+.cc-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  user-select: none;
+  transition: background 150ms ease;
+}
+.cc-section-header:hover {
+  background: var(--color-surface-offset);
+  color: var(--color-text);
+}
+
+/* Section content */
+.cc-section-body {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cc-section-body h4 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 4px;
+  text-transform: none;
+}
+
+/* Research citation card */
+.cc-citation {
+  background: var(--color-surface-offset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
 .cc-method-controls {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+  padding: 14px 16px;
+}
+
+/* Exposure Gain Slider — polished input */
+.cc-param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cc-param-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.cc-param-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Custom slider styling */
-.cc-slider {
+.cc-slider,
+input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 6px;
+  height: 4px;
+  background: var(--color-border);
   border-radius: var(--radius-full);
-  background: var(--color-secondary);
   outline: none;
-  transition: background 0.2s;
 }
 
-.cc-slider:hover {
-  background: var(--color-secondary-hover);
-}
-
-.cc-slider::-webkit-slider-thumb {
+.cc-slider::-webkit-slider-thumb,
+input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--accent-color);
+  background: var(--color-primary);
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+  transition: transform 150ms ease;
 }
 
-.cc-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+.cc-slider::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
 }
 
-.cc-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+.cc-slider::-moz-range-thumb,
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: var(--accent-color);
+  background: var(--color-primary);
   cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+  transition: transform 150ms ease;
 }
 
-.cc-slider::-moz-range-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+.cc-slider::-moz-range-thumb:hover,
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.2);
 }
 
 /* Theory Section */

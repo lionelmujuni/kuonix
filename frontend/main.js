@@ -18,13 +18,31 @@ function getDcrawEmuPath() {
   return path.join(app.getAppPath(), 'bin', platform, binName);
 }
 
+// Resolve the Java executable — prefers the bundled JRE, falls back to system Java
+function getJavaExecutable() {
+  const fs = require('fs');
+  const javaExe = process.platform === 'win32' ? 'javaw.exe' : 'java';
+  // In a packaged app, extraResources land next to app.asar in process.resourcesPath
+  // In development the jre/ folder sits directly inside the app directory
+  const basePath = app.isPackaged ? process.resourcesPath : app.getAppPath();
+  const bundledJava = path.join(basePath, 'jre', 'bin', javaExe);
+  if (fs.existsSync(bundledJava)) {
+    return bundledJava;
+  }
+  // Fallback: use whatever java/javaw is on PATH
+  return process.platform === 'win32' ? 'javaw' : 'java';
+}
+
 // Start backend when Electron starts
 function startBackend() {
-  const jarPath = path.join(app.getAppPath(), 'kuonix.jar');
+  // kuonix.jar is unpacked from the asar so Java can access it as a real file
+  const jarPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'app.asar.unpacked', 'kuonix.jar')
+    : path.join(app.getAppPath(), 'kuonix.jar');
   
   // Spawn a child process with hidden window (no console popup)
   // Using javaw.exe on Windows instead of java.exe prevents console window
-  const javaExecutable = process.platform === 'win32' ? 'javaw' : 'java';
+  const javaExecutable = getJavaExecutable();
   
   // Add JVM arguments to suppress Java 25 warnings and enable native access for OpenCV
   const jvmArgs = [
@@ -59,6 +77,11 @@ function startBackend() {
     if (!msg.includes('WARNING:') && !msg.includes('sun.misc.Unsafe')) {
       console.error(`Backend Error: ${msg}`);
     }
+  });
+
+  backendProcess.on("error", (err) => {
+    console.error(`Backend process error (Java not found or failed to launch): ${err.message}`);
+    backendProcess = null;
   });
 
   backendProcess.on("close", (code) => {
@@ -224,9 +247,23 @@ ipcMain.handle('select-reference-image', async () => {
   return result.canceled ? null : { filePath: result.filePaths[0] };
 });
 
-ipcMain.handle("launch-app", async (event, appPath, args) => {
+ipcMain.handle("launch-app", async (event, appPath, args, useAdmin) => {
+  if (useAdmin && process.platform === 'win32') {
+    const quotedArgs = (args || []).map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ');
+    const cmd = `"${appPath}" ${quotedArgs}`;
+    return new Promise((resolve, reject) => {
+      sudo.exec(cmd, { name: 'Kuonix' }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Elevated launch error:', error);
+          reject(error);
+        } else {
+          resolve('Launched with elevation');
+        }
+      });
+    });
+  }
   return new Promise((resolve, reject) => {
-    const child = execFile(appPath, args, (error) => {
+    execFile(appPath, args, (error) => {
       if (error) {
         console.error("Launch error:", error);
         reject(error);
@@ -251,7 +288,7 @@ function searchExecutableQuick(filename) {
     let cmd;
 
     if (process.platform === 'win32') {
-      cmd = `where ${filename}`;
+      cmd = `where "${filename}"`;
     } else if (process.platform === 'darwin') {
       cmd = `mdfind "kMDItemFSName == '${filename}'" | head -n 1`;
     } else {

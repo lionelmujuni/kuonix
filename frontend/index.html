@@ -260,66 +260,70 @@
             <!-- Color Correction Lab View -->
             <div id="colorCorrectionView" class="color-correction-view" style="display:none;">
                 
-                <!-- Left Panel: Tool Bar (narrow vertical toolbar) -->
-                <div class="cc-toolbar">
-                    <h4 class="cc-toolbar-title">Tool Bar</h4>
-                    <div class="cc-toolbar-buttons">
-                        <button class="cc-tool-btn" id="ccToolZoomIn" title="Zoom In">
-                            <i class="bi bi-zoom-in"></i>
+                <!-- ROW 1: Top bar, spans all columns -->
+                <div class="cc-topbar">
+                    <button id="ccBackToGridBtn" class="btn btn--secondary btn--sm">
+                        <i class="bi bi-arrow-left"></i> Back to Grid
+                    </button>
+                    <span id="ccPreviewImageName" class="cc-topbar-info">image.jpg</span>
+                    <div class="cc-topbar-actions">
+                        <button id="ccBeforeAfterToggle" class="btn btn--secondary btn--sm">
+                            <i class="bi bi-eye"></i> Before/After
                         </button>
-                        <button class="cc-tool-btn" id="ccToolZoomOut" title="Zoom Out">
-                            <i class="bi bi-zoom-out"></i>
-                        </button>
-                        <button class="cc-tool-btn" id="ccToolFit" title="Fit to View">
-                            <i class="bi bi-arrows-fullscreen"></i>
-                        </button>
-                        <button class="cc-tool-btn" id="ccToolRotate" title="Rotate">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
-                        <div class="cc-toolbar-divider"></div>
-                        <button class="cc-tool-btn active" id="ccToolGridView" title="Grid View">
-                            <i class="bi bi-grid-3x3-gap"></i>
-                        </button>
-                        <button class="cc-tool-btn" id="ccToolPreviewView" title="Single Image View">
-                            <i class="bi bi-image"></i>
-                        </button>
-                        <div class="cc-toolbar-divider"></div>
-                        <button class="cc-tool-btn" id="ccToolCompare" title="Compare Before/After">
-                            <i class="bi bi-layout-split"></i>
-                        </button>
-                        <button class="cc-tool-btn" id="ccToolUndo" title="Undo">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
-                        <button class="cc-tool-btn" id="ccToolRedo" title="Redo">
-                            <i class="bi bi-arrow-clockwise"></i>
+                        <button id="ccResetBtn" class="btn btn--secondary btn--sm">
+                            <i class="bi bi-arrow-counterclockwise"></i> Reset
                         </button>
                     </div>
-                    
-                    <!-- Category Selector (moved inside toolbar) -->
-                    <div class="cc-toolbar-divider"></div>
-                    <h4 class="cc-toolbar-title">Categories</h4>
-                    <div class="cc-method-list">
-                        <button class="cc-method-btn" data-category="white_balance" title="White Balance">
-                            <i class="bi bi-brightness-high"></i>
-                            <span>White Balance</span>
-                        </button>
-                        <button class="cc-method-btn" data-category="exposure" title="Exposure">
-                            <i class="bi bi-circle-half"></i>
-                            <span>Exposure</span>
-                        </button>
-                        <button class="cc-method-btn" data-category="saturation" title="Saturation">
-                            <i class="bi bi-palette"></i>
-                            <span>Saturation</span>
-                        </button>
-                        <button class="cc-method-btn" data-category="advanced" title="Advanced">
-                            <i class="bi bi-sliders"></i>
-                            <span>Advanced</span>
-                        </button>
-                    </div>
+                    <button id="ccSaveCurrentBtn" class="btn btn--success btn--sm" disabled>
+                        <i class="bi bi-download"></i> Save This Image
+                    </button>
                 </div>
 
-                <!-- Center Panel: Grid View + Preview -->
-                <div class="cc-center-panel">
+                <!-- ROW 2 COL 1: Left tool icons -->
+                <div class="cc-left-toolbar">
+                    <button class="cc-tool-btn" id="ccToolZoomIn" title="Zoom In">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="cc-tool-btn" id="ccToolZoomOut" title="Zoom Out">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="cc-tool-btn" id="ccToolFit" title="Fit to View">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                    </button>
+                    <div class="cc-toolbar-divider"></div>
+                    <button class="cc-tool-btn active" id="ccToolGridView" title="Grid View">
+                        <i class="bi bi-grid-3x3-gap"></i>
+                    </button>
+                    <button class="cc-tool-btn" id="ccToolPreviewView" title="Single Image View">
+                        <i class="bi bi-image"></i>
+                    </button>
+                    <div class="cc-toolbar-divider"></div>
+                    <button class="cc-tool-btn" id="ccToolCompare" title="Compare Before/After">
+                        <i class="bi bi-layout-split"></i>
+                    </button>
+                    <button class="cc-tool-btn" id="ccToolUndo" title="Undo">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                    <button class="cc-tool-btn" id="ccToolRedo" title="Redo">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <div class="cc-toolbar-divider"></div>
+                    <button class="cc-method-btn" data-category="white_balance" title="White Balance">
+                        <i class="bi bi-brightness-high"></i>
+                    </button>
+                    <button class="cc-method-btn" data-category="exposure" title="Exposure">
+                        <i class="bi bi-circle-half"></i>
+                    </button>
+                    <button class="cc-method-btn" data-category="saturation" title="Saturation">
+                        <i class="bi bi-palette"></i>
+                    </button>
+                    <button class="cc-method-btn" data-category="advanced" title="Advanced">
+                        <i class="bi bi-sliders"></i>
+                    </button>
+                </div>
+
+                <!-- ROW 2 COL 2: Canvas Area -->
+                <div class="cc-canvas-area" id="ccPreviewContainer">
                     <!-- Grid View (shows all images in session) -->
                     <div id="ccGridView" class="cc-grid-view">
                         <div id="ccImagesGrid" class="cc-images-grid">
@@ -333,81 +337,47 @@
                     
                     <!-- Single Image Preview View (hidden by default) -->
                     <div id="ccPreviewView" class="cc-preview-panel" style="display:none;">
-                        <!-- Back to grid button -->
-                        <div class="cc-preview-nav">
-                            <button id="ccBackToGridBtn" class="btn btn--secondary btn--sm">
-                                <i class="bi bi-arrow-left"></i> Back to Grid
-                            </button>
-                            <span id="ccPreviewImageName" class="cc-preview-image-name">image.jpg</span>
+                        <div class="cc-no-image" id="ccNoImage">
+                            <i class="bi bi-image" style="font-size: 48px; opacity: 0.3;"></i>
+                            <p>Select an image from the grid to begin</p>
                         </div>
                         
-                        <!-- Multi-image navigation bar (shown when multiple images in session) -->
-                        <div id="ccNavigationBar" class="cc-navigation-bar" style="display:none;">
-                            <button id="ccPrevImageBtn" class="btn btn--secondary btn--sm">
-                                <i class="bi bi-chevron-left"></i>
-                            </button>
-                            <div class="cc-image-counter">
-                                <span id="ccCurrentImageNum">1</span> / <span id="ccTotalImages">1</span>
-                            </div>
-                            <button id="ccNextImageBtn" class="btn btn--secondary btn--sm">
-                                <i class="bi bi-chevron-right"></i>
-                            </button>
-                            <button id="ccRemoveFromLabBtn" class="btn btn--secondary btn--sm" style="margin-left: auto;">
-                                <i class="bi bi-x-circle"></i> Remove
-                            </button>
-                        </div>
-                        
-                        <div class="cc-preview-header">
-                            <h3 style="margin: 0; font-size: 16px;">Picture preview</h3>
-                            <div class="cc-preview-controls">
-                                <button id="ccBeforeAfterToggle" class="btn btn--secondary btn--sm">
-                                    <i class="bi bi-eye"></i> Before/After
-                                </button>
-                                <button id="ccResetBtn" class="btn btn--secondary btn--sm">
-                                    <i class="bi bi-arrow-counterclockwise"></i> Reset
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="cc-preview-container">
-                            <div class="cc-no-image" id="ccNoImage">
-                                <i class="bi bi-image" style="font-size: 48px; opacity: 0.3;"></i>
-                                <p>Select an image from the grid to begin</p>
-                            </div>
+                        <div class="cc-image-container" id="ccImageContainer" style="display:none;">
+                            <img id="ccOriginalImage" class="cc-preview-image" alt="Original">
+                            <img id="ccCorrectedImage" class="cc-preview-image cc-corrected" alt="Corrected" style="display:none;">
                             
-                            <div class="cc-image-container" id="ccImageContainer" style="display:none;">
-                                <img id="ccOriginalImage" class="cc-preview-image" alt="Original">
-                                <img id="ccCorrectedImage" class="cc-preview-image cc-corrected" alt="Corrected" style="display:none;">
-                                
-                                <!-- Split view overlay -->
-                                <div class="cc-split-overlay" id="ccSplitOverlay" style="display:none;">
-                                    <div class="cc-split-handle"></div>
-                                </div>
-                            </div>
-
-                            <!-- Loading overlay -->
-                            <div class="cc-loading" id="ccLoading" style="display:none;">
-                                <i class="bi bi-hourglass-split" style="font-size: 32px; animation: rotate 1.5s linear infinite;"></i>
-                                <p>Processing...</p>
+                            <!-- Split view overlay -->
+                            <div class="cc-split-overlay" id="ccSplitOverlay" style="display:none;">
+                                <div class="cc-split-handle"></div>
                             </div>
                         </div>
 
-                        <div class="cc-preview-footer">
-                            <button id="ccSaveCurrentBtn" class="btn btn--success" disabled>
-                                <i class="bi bi-download"></i> Save This Image
-                            </button>
-                            <button id="ccApplyToAllBtn" class="btn btn--primary" disabled style="display:none;">
-                                <i class="bi bi-stack"></i> Apply to All
-                            </button>
-                            <button id="ccSaveAllBtn" class="btn btn--success" disabled style="display:none;">
-                                <i class="bi bi-download"></i> Save All
-                            </button>
+                        <!-- Loading overlay -->
+                        <div class="cc-loading" id="ccLoading" style="display:none;">
+                            <i class="bi bi-hourglass-split" style="font-size: 32px; animation: rotate 1.5s linear infinite;"></i>
+                            <p>Processing...</p>
                         </div>
+                    </div>
+
+                    <!-- Multi-image navigation bar (floating overlay) -->
+                    <div id="ccNavigationBar" class="cc-navigation-bar" style="display:none;">
+                        <button id="ccPrevImageBtn" class="cc-nav-btn">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <div class="cc-image-counter">
+                            <span id="ccCurrentImageNum">1</span> / <span id="ccTotalImages">1</span>
+                        </div>
+                        <button id="ccNextImageBtn" class="cc-nav-btn">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                        <button id="ccRemoveFromLabBtn" class="cc-nav-btn cc-nav-btn--danger">
+                            <i class="bi bi-x-circle"></i>
+                        </button>
                     </div>
                 </div>
 
-                <!-- Right Panel: Controls & Theory -->
-                <div class="cc-controls-panel">
+                <!-- ROW 2 COL 3: Right Panel (Controls / Algorithm / Presets) -->
+                <div class="cc-right-panel">
                     <h3 style="margin: 0 0 16px 0; font-size: 16px;">Controls</h3>
                     
                     <!-- Algorithm dropdown selector -->
@@ -466,6 +436,6 @@
             </div><!-- /.container -->
         </main><!-- /.main-content -->
     </div><!-- /.app-layout -->
-    <script src="renderer.js"></script>
+    <script type="module" src="renderer.js"></script>
 </body>
 </html>
