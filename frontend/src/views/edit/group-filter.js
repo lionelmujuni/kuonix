@@ -63,7 +63,7 @@ export function createGroupFilter() {
     });
 
     if (!isReduced) {
-      gsap.from(root.querySelectorAll(".group-chip"), {
+      gsap.from([...root.querySelectorAll(".group-chip")], {
         opacity: 0, y: 4, duration: 0.25, ease: "expo.out",
         stagger: 0.03, clearProps: "transform",
       });

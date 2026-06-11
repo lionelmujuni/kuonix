@@ -720,6 +720,7 @@
 /* ----- Edit view layout --------------------------------------------- */
 .edit-view {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -832,7 +833,9 @@
 /* Working state ------------------------------------------------------ */
 .edit-working {
   flex: 1;
+  min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   min-height: 0;
 }
@@ -916,9 +919,6 @@
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid var(--color-card-border);
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-height: 0;
 }
 @media (prefers-color-scheme: dark) { .image-stage { background: rgba(0, 0, 0, 0.35); } }
@@ -926,9 +926,8 @@
 [data-color-scheme="light"] .image-stage { background: rgba(0, 0, 0, 0.04); }
 
 .image-stage__canvas {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 .image-stage__img {
   position: absolute;
@@ -939,6 +938,12 @@
   opacity: 0;
 }
 .image-stage__placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
@@ -954,6 +959,7 @@
 }
 .histogram-strip__canvas {
   flex: 1;
+  min-width: 0;
   height: 56px;
   border-radius: var(--radius-base);
   background: rgba(127, 127, 127, 0.06);

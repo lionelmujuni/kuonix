@@ -5,7 +5,7 @@
 // restarts, the library starts empty.
 
 import { gsap } from "../../../node_modules/gsap/index.js";
-import { enterView, isReduced } from "../../motion.js";
+import { enterView, isReduced, dur, ease } from "../../motion.js";
 import * as state from "../../state.js";
 import { navigate } from "../../router.js";
 import { toast } from "../../components/toast/index.js";
@@ -237,7 +237,7 @@ function animateEmptyIn(emptyEl) {
   // Fade in the container first, then stagger the children.
   gsap.from(emptyEl, { opacity: 0, duration: dur.enter, ease: ease.enter });
 
-  gsap.from([illus, hdline, sub, btn], {
+  gsap.from([illus, hdline, sub, btn].filter(Boolean), {
     opacity: 0, y: 18, duration: dur.reveal, ease: ease.enter,
     stagger: 0.08, delay: 0.2,
   });
@@ -411,7 +411,7 @@ function render(view) {
 
   // Subtle stagger on first paint after a render.
   if (!isReduced) {
-    gsap.from(grid.querySelectorAll(".lib-card"), {
+    gsap.from([...grid.querySelectorAll(".lib-card")], {
       opacity: 0, y: 8, duration: 0.3, ease: "expo.out",
       stagger: { each: 0.02, from: "start" },
       clearProps: "all",

@@ -376,7 +376,7 @@ function render(view) {
     sel.length === 0 ? "Export" : `Export ${sel.length}`;
 
   if (!isReduced) {
-    gsap.from(view.querySelectorAll(".export-row"), {
+    gsap.from([...view.querySelectorAll(".export-row")], {
       opacity: 0, x: -8, duration: 0.25, ease: "expo.out",
       stagger: { each: 0.02, from: "start" }, clearProps: "all",
     });

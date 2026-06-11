@@ -21,10 +21,10 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@vitest/coverage-v8": "^2.1.8",
-    "electron": "^29.4.6",
+    "@vitest/coverage-v8": "^4.1.8",
+    "electron": "^42.3.3",
     "jsdom": "^25.0.1",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "electron-sudo": "^4.0.12",

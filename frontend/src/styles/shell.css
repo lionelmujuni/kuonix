@@ -175,6 +175,25 @@
   border-right: none;
 }
 
+/* Adjust panel active — blur shell chrome so the image stage reads clearly.
+   filter: blur() is applied to individual elements so .image-stage is
+   never touched. Both rules carry the transition so it fires on enter AND exit. */
+.app-shell.is-adjusting .titlebar,
+.app-shell.is-adjusting .agent-rail,
+.app-shell.is-adjusting .analysis-ribbon,
+.app-shell.is-adjusting .histogram-strip {
+  filter: blur(4px);
+  opacity: 0.45;
+  pointer-events: none;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+.app-shell:not(.is-adjusting) .titlebar,
+.app-shell:not(.is-adjusting) .agent-rail,
+.app-shell:not(.is-adjusting) .analysis-ribbon,
+.app-shell:not(.is-adjusting) .histogram-strip {
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
 /* Left nav */
 .left-nav {
   display: flex;
@@ -266,6 +285,7 @@
    image stage 1fr grid row gets non-zero height. */
 #view-outlet {
   min-height: 100%;
+  min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;

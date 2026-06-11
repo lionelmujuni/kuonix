@@ -55,6 +55,7 @@ export async function openSlidersPanel() {
   let cleanupFns = [];
 
   const appBody = document.querySelector(".app-body");
+  const appShell = appBody?.closest(".app-shell");
 
   const panel = createPanel({
     side: "right",
@@ -63,8 +64,9 @@ export async function openSlidersPanel() {
     subtitle: "Direct controls — every move previews live.",
     className: "panel--sliders",
     onClose: () => {
-      // Restore left nav.
+      // Restore left nav and surrounding UI blur.
       appBody?.classList.remove("nav-collapsed");
+      appShell?.classList.remove("is-adjusting");
       // Tear down listeners.
       for (const fn of cleanupFns) try { fn(); } catch {}
       cleanupFns = [];
@@ -81,7 +83,9 @@ export async function openSlidersPanel() {
 
   // Collapse left nav so the full image is visible during adjustments.
   appBody?.classList.add("nav-collapsed");
-  // Remove backdrop blur so color corrections can be previewed clearly.
+  // Blur surrounding UI so the image stage reads clearly during corrections.
+  appShell?.classList.add("is-adjusting");
+  // Remove backdrop so corrections are visible on the stage.
   panel.overlay.querySelector(".panel-backdrop")?.classList.add("panel-backdrop--clear");
 
   panel.body.innerHTML = template();

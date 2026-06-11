@@ -58,7 +58,7 @@ export function enterView(scopeEl) {
     }
     const cards = scopeEl.querySelectorAll(".reveal, .card, .tool-card, .image-card");
     if (cards.length) {
-      tl.from(cards, reduced
+      tl.from([...cards], reduced
         ? instant({ opacity: 0 })
         : { opacity: 0, y: 16, scale: 0.98, duration: dur.reveal, ease: ease.enter,
             stagger: { amount: Math.min(0.4, cards.length * 0.06), from: "start" },
@@ -129,7 +129,7 @@ export function streamingDots(containerEl) {
   if (!containerEl || reduced) return { kill() {} };
   const dots = containerEl.querySelectorAll(".dot");
   if (!dots.length) return { kill() {} };
-  return gsap.to(dots, {
+  return gsap.to([...dots], {
     y: -6, opacity: 1,
     duration: 0.4, ease: ease.pulse,
     yoyo: true, repeat: -1,
@@ -141,7 +141,7 @@ export function stopStreamingDots(anim, containerEl) {
   anim?.kill?.();
   if (!containerEl) return;
   const dots = containerEl.querySelectorAll(".dot");
-  gsap.to(dots, { y: 0, opacity: 0.3, duration: 0.2, ease: "power2.out" });
+  if (dots.length) gsap.to([...dots], { y: 0, opacity: 0.3, duration: 0.2, ease: "power2.out" });
 }
 
 export function crossfadeStage(prevEl, nextEl, duration = 0.5) {

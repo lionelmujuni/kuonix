@@ -136,7 +136,7 @@ export function mount(outlet) {
   ctx = enterView(outlet);
 
   if (!isReduced) {
-    gsap.from(view.querySelectorAll(".help-card"), {
+    gsap.from([...view.querySelectorAll(".help-card")], {
       opacity: 0, y: 12, duration: 0.4, ease: "expo.out",
       stagger: { each: 0.05, from: "start" }, clearProps: "all",
     });

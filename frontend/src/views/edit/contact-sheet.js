@@ -43,7 +43,7 @@ export function createContactSheet({ onAddMore } = {}) {
         cardByPath.set(img.path, card);
       });
       if (!isReduced) {
-        gsap.from(grid.querySelectorAll(".contact-card"), {
+        gsap.from([...grid.querySelectorAll(".contact-card")], {
           opacity: 0, y: 8, scale: 0.97,
           duration: 0.35, ease: "expo.out",
           stagger: { each: 0.04, from: "start" },

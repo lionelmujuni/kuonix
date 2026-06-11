@@ -89,7 +89,7 @@ export function renderEmptyState(onFiles, { mode = "single" } = {}) {
 
   // Subtle ambient pulse on the corner brackets so they feel alive while empty.
   if (!isReduced) {
-    gsap.to(wrap.querySelectorAll(".drop-zone__corner"), {
+    gsap.to([...wrap.querySelectorAll(".drop-zone__corner")], {
       opacity: 0.7,
       duration: 1.6,
       ease: "sine.inOut",

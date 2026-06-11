@@ -24,8 +24,13 @@ export function createHistogramStrip() {
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.clientWidth || 600;
     const cssH = canvas.clientHeight || 56;
-    canvas.width = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
+    const newW = Math.floor(cssW * dpr);
+    const newH = Math.floor(cssH * dpr);
+    // Guard: avoid ResizeObserver feedback loop — setting canvas.width changes
+    // the element's intrinsic size which can re-trigger the observer.
+    if (canvas.width === newW && canvas.height === newH) return;
+    canvas.width = newW;
+    canvas.height = newH;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -55,7 +60,7 @@ export function createHistogramStrip() {
     syncCanvasSize();
     if (typeof ResizeObserver !== "undefined") {
       resizeObs = new ResizeObserver(syncCanvasSize);
-      resizeObs.observe(canvas);
+      resizeObs.observe(root);
     }
   }
 
