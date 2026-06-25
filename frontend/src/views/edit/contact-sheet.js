@@ -6,6 +6,8 @@ import { gsap } from "../../../node_modules/gsap/index.js";
 import { isReduced } from "../../motion.js";
 import * as state from "../../state.js";
 import { openLightbox } from "../../components/image-lightbox/index.js";
+import { openIssueDrawer } from "../../components/issue-drawer/index.js";
+import { getIssueMeta } from "../../components/issue-meta.js";
 
 export function createContactSheet({ onAddMore } = {}) {
   const root = document.createElement("div");
@@ -84,8 +86,7 @@ export function createContactSheet({ onAddMore } = {}) {
     nameEl.textContent = img.name || filenameOf(img.path);
     nameEl.title = img.name || filenameOf(img.path);
 
-    renderIssueDots(card.querySelector(".contact-card__issues"), img.issues);
-    renderProgress(card, img.state);
+    renderCardMeta(card, img);
 
     card.addEventListener("click", (e) => {
       // Ctrl/Cmd-click → toggle selection without opening preview.
@@ -140,8 +141,7 @@ export function createContactSheet({ onAddMore } = {}) {
       const im = card.querySelector(".contact-card__thumb img");
       if (im && im.src !== img.url) im.src = img.url;
     }
-    renderIssueDots(card.querySelector(".contact-card__issues"), img.issues);
-    renderProgress(card, img.state);
+    renderCardMeta(card, img);
   }
 
   function bind() {
@@ -164,6 +164,48 @@ export function createContactSheet({ onAddMore } = {}) {
     return () => { for (const u of unsubs) u(); };
   }
 
+  function renderCardMeta(card, img) {
+    const isBusy = img.state === "uploading" || img.state === "decoding" || img.state === "analyzing";
+    card.classList.toggle("is-busy", isBusy);
+    const issuesEl = card.querySelector(".contact-card__issues");
+    if (isBusy) {
+      const labels = { uploading: "Uploading…", decoding: "Decoding…", analyzing: "Analyzing…" };
+      issuesEl.innerHTML = `<span class="contact-card__state-label">${labels[img.state] || ""}</span>`;
+    } else {
+      issuesEl.innerHTML = "";
+      if (Array.isArray(img.issues) && img.issues.length) {
+        const shown = img.issues.slice(0, 4);
+        for (const issue of shown) {
+          const meta = getIssueMeta(issue);
+          const dot = document.createElement("button");
+          dot.type = "button";
+          dot.className = `issue-dot issue-dot--${meta.family}`;
+          dot.title = meta.label;
+          dot.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openIssueDrawer(issue, dot, { imagePath: img.path });
+          });
+          issuesEl.appendChild(dot);
+        }
+        if (img.issues.length > 4) {
+          const more = document.createElement("span");
+          more.className = "issue-dot issue-dot--more";
+          more.textContent = `+${img.issues.length - 4}`;
+          issuesEl.appendChild(more);
+        }
+      }
+    }
+    const bar = card.querySelector(".contact-card__progress .bar");
+    if (bar && !isBusy) bar.style.width = "";
+  }
+
+  function updateProgress(path, progress) {
+    const card = cardByPath.get(path);
+    if (!card) return;
+    const bar = card.querySelector(".contact-card__progress .bar");
+    if (bar) bar.style.width = `${Math.round(progress * 100)}%`;
+  }
+
   // Footer actions
   root.querySelector('[data-action="select-all"]').addEventListener("click", () => state.selectAll(true));
   root.querySelector('[data-action="select-none"]').addEventListener("click", () => state.selectAll(false));
@@ -173,39 +215,10 @@ export function createContactSheet({ onAddMore } = {}) {
     el: root,
     render,
     patchCard,
+    updateProgress,
     bind,
     destroy() {/* unsub returned from bind() */},
   };
-}
-
-function renderIssueDots(host, issues) {
-  host.innerHTML = "";
-  if (!Array.isArray(issues) || !issues.length) return;
-  // Up to 4 dots — color-coded by family.
-  const families = issues.map(family).slice(0, 4);
-  for (const fam of families) {
-    const dot = document.createElement("span");
-    dot.className = `issue-dot issue-dot--${fam}`;
-    host.appendChild(dot);
-  }
-  if (issues.length > 4) {
-    const more = document.createElement("span");
-    more.className = "issue-dot issue-dot--more";
-    more.textContent = `+${issues.length - 4}`;
-    host.appendChild(more);
-  }
-}
-
-function family(issue) {
-  const s = String(issue || "").toUpperCase();
-  if (s.includes("EXPOS") || s.includes("CONTRAST") || s.includes("BRIGHT")) return "exposure";
-  if (s.includes("CAST") || s.includes("WHITE_BALANCE") || s.includes("SAT")) return "cast";
-  if (s.includes("NOISE") || s.includes("FOCUS") || s.includes("CLIP") || s.includes("HIGHLIGHT")) return "noise";
-  return "other";
-}
-
-function renderProgress(card, st) {
-  card.classList.toggle("is-busy", st === "uploading" || st === "decoding" || st === "analyzing");
 }
 
 function filenameOf(p) {

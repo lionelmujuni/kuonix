@@ -24,6 +24,7 @@ dependencies {
 	implementation 'org.bytedeco:opencv-platform:4.10.0-1.5.11'
 	implementation 'com.twelvemonkeys.imageio:imageio-tiff:3.10.1'
 	implementation 'commons-codec:commons-codec:1.16.0'
+	implementation 'com.drewnoakes:metadata-extractor:2.19.0'
 
 	// LangChain4j agent layer (Ollama Cloud) — plain libs, beans created in DynamicOllamaConfig
 	implementation 'dev.langchain4j:langchain4j:1.13.0'

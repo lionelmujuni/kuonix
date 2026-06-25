@@ -27,6 +27,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import app.restful.api.dto.DecodeProgressEvent;
 import app.restful.api.dto.RawImageInfo;
 import app.restful.api.dto.RawUploadResponse;
+import app.restful.dto.ExifData;
+import app.restful.services.ExifCache;
+import app.restful.services.ExifExtractorService;
 import app.restful.services.RawProcessingService;
 import app.restful.services.StorageService;
 
@@ -46,13 +49,19 @@ public class RawImageController {
     
     private final RawProcessingService rawService;
     private final StorageService storageService;
+    private final ExifExtractorService exifExtractor;
+    private final ExifCache exifCache;
     private final ObjectMapper objectMapper;
-    
-    public RawImageController(RawProcessingService rawService, 
+
+    public RawImageController(RawProcessingService rawService,
                              StorageService storageService,
+                             ExifExtractorService exifExtractor,
+                             ExifCache exifCache,
                              ObjectMapper objectMapper) {
         this.rawService = rawService;
         this.storageService = storageService;
+        this.exifExtractor = exifExtractor;
+        this.exifCache = exifCache;
         this.objectMapper = objectMapper;
     }
     
@@ -123,16 +132,18 @@ public class RawImageController {
                 rawService.registerTask(taskId, rawPath);
                 rawService.decodeFullAsync(rawPath, taskId);
                 
-                // Extract camera model (optional, may be slow)
-                String cameraModel = null; // Could parse from EXIF if needed
-                
+                ExifData exif = exifExtractor.extract(rawPath);
+                exifCache.put(rawPath, exif);
+                String cameraModel = exif.camera();
+
                 imageInfos.add(new RawImageInfo(
                     previewPath.toString(),
                     rawPath.toString(),
                     taskId,
                     width,
                     height,
-                    cameraModel
+                    cameraModel,
+                    exif
                 ));
                 
                 log.info("RAW image processed: {} -> preview: {}, task: {}", 

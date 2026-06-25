@@ -4,22 +4,7 @@
 import { gsap } from "../../../node_modules/gsap/index.js";
 import { isReduced } from "../../motion.js";
 import * as state from "../../state.js";
-
-const ISSUE_LABELS = {
-  UNDEREXPOSED: "Underexposed",
-  OVEREXPOSED: "Overexposed",
-  LOW_CONTRAST: "Low contrast",
-  HIGH_CONTRAST: "High contrast",
-  LOW_SATURATION: "Low saturation",
-  HIGH_SATURATION: "High saturation",
-  COLOR_CAST_WARM: "Warm cast",
-  COLOR_CAST_COOL: "Cool cast",
-  COLOR_CAST_GREEN: "Green cast",
-  COLOR_CAST_MAGENTA: "Magenta cast",
-  SHADOW_NOISE: "Shadow noise",
-  HIGHLIGHT_CLIP: "Highlights clipped",
-  SOFT_FOCUS: "Soft focus",
-};
+import { getIssueMeta } from "../../components/issue-meta.js";
 
 export function createGroupFilter() {
   const root = document.createElement("div");
@@ -39,7 +24,7 @@ export function createGroupFilter() {
     const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
     const chips = [
       { id: null, label: "All", count: total },
-      ...sorted.map(([id, count]) => ({ id, label: ISSUE_LABELS[id] || prettify(id), count })),
+      ...sorted.map(([id, count]) => ({ id, label: getIssueMeta(id).label, count })),
     ];
 
     root.innerHTML = "";
@@ -83,9 +68,6 @@ export function createGroupFilter() {
   };
 }
 
-function prettify(s) {
-  return String(s || "").toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

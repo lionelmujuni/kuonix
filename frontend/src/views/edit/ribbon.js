@@ -11,22 +11,9 @@
 
 import { gsap } from "../../../node_modules/gsap/index.js";
 import { streamingDots, stopStreamingDots, progressTo, isReduced } from "../../motion.js";
-
-const ISSUE_META = {
-  UNDEREXPOSED:    { label: "Underexposed",    family: "exposure", icon: "bi-moon-stars" },
-  OVEREXPOSED:     { label: "Overexposed",     family: "exposure", icon: "bi-brightness-high" },
-  LOW_CONTRAST:    { label: "Low contrast",    family: "exposure", icon: "bi-circle-half" },
-  HIGH_CONTRAST:   { label: "High contrast",   family: "exposure", icon: "bi-circle-half" },
-  LOW_SATURATION:  { label: "Low saturation",  family: "cast",     icon: "bi-droplet" },
-  HIGH_SATURATION: { label: "High saturation", family: "cast",     icon: "bi-droplet-fill" },
-  COLOR_CAST_WARM: { label: "Warm cast",       family: "cast",     icon: "bi-sun" },
-  COLOR_CAST_COOL: { label: "Cool cast",       family: "cast",     icon: "bi-cloud" },
-  COLOR_CAST_GREEN:{ label: "Green cast",      family: "cast",     icon: "bi-tree" },
-  COLOR_CAST_MAGENTA:{ label: "Magenta cast",  family: "cast",     icon: "bi-flower1" },
-  SHADOW_NOISE:    { label: "Shadow noise",    family: "noise",    icon: "bi-grid-3x3" },
-  HIGHLIGHT_CLIP:  { label: "Highlights clipped", family: "noise",  icon: "bi-exclamation-triangle" },
-  SOFT_FOCUS:      { label: "Soft focus",      family: "noise",    icon: "bi-eye-slash" },
-};
+import { openIssueDrawer } from "../../components/issue-drawer/index.js";
+import { getIssueMeta } from "../../components/issue-meta.js";
+import * as state from "../../state.js";
 
 export function createAnalysisRibbon() {
   const root = document.createElement("div");
@@ -108,10 +95,15 @@ export function createAnalysisRibbon() {
 
       statusText.textContent = `${list.length} issue${list.length === 1 ? "" : "s"}`;
       const chips = list.map((issue) => {
-        const meta = ISSUE_META[issue] || { label: prettify(issue), family: "other", icon: "bi-circle" };
-        const chip = document.createElement("span");
+        const meta = getIssueMeta(issue);
+        const chip = document.createElement("button");
+        chip.type = "button";
         chip.className = `issue-chip issue-chip--${meta.family}`;
+        chip.title = "Click for details";
         chip.innerHTML = `<i class="bi ${meta.icon}"></i> ${meta.label}`;
+        chip.addEventListener("click", () => {
+          openIssueDrawer(issue, chip, { imagePath: state.get("currentImagePath") });
+        });
         chipsEl.appendChild(chip);
         return chip;
       });
@@ -144,8 +136,4 @@ export function createAnalysisRibbon() {
 
     el: root,
   };
-}
-
-function prettify(s) {
-  return String(s).toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

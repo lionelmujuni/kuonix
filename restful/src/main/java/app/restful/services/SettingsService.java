@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import app.restful.dto.AppModules;
 import app.restful.dto.OllamaSettings;
 
 /**
@@ -21,11 +22,13 @@ import app.restful.dto.OllamaSettings;
 public class SettingsService {
 
     private static final Logger log = LoggerFactory.getLogger(SettingsService.class);
-    private static final Path SETTINGS_DIR = Paths.get(System.getProperty("user.home"), ".kuonix");
+    private static final Path SETTINGS_DIR        = Paths.get(System.getProperty("user.home"), ".kuonix");
     private static final Path OLLAMA_SETTINGS_FILE = SETTINGS_DIR.resolve("ollama-settings.json");
-    
+    private static final Path MODULES_FILE         = SETTINGS_DIR.resolve("app-modules.json");
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private OllamaSettings cachedOllamaSettings;
+    private AppModules cachedModules;
 
     public SettingsService() {
         try {
@@ -75,10 +78,32 @@ public class SettingsService {
         log.info("Saved Ollama settings to: {}", OLLAMA_SETTINGS_FILE);
     }
 
-    /**
-     * Clear cached settings (useful for testing or forcing reload).
-     */
+    public boolean isFirstRun() {
+        return !Files.exists(MODULES_FILE);
+    }
+
+    public AppModules getModules() {
+        if (cachedModules != null) return cachedModules;
+        if (Files.exists(MODULES_FILE)) {
+            try {
+                cachedModules = objectMapper.readValue(MODULES_FILE.toFile(), AppModules.class);
+                return cachedModules;
+            } catch (IOException e) {
+                log.error("Failed to load app modules, using defaults", e);
+            }
+        }
+        cachedModules = AppModules.defaults();
+        return cachedModules;
+    }
+
+    public void saveModules(AppModules modules) throws IOException {
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(MODULES_FILE.toFile(), modules);
+        cachedModules = modules;
+        log.info("Saved app modules to: {}", MODULES_FILE);
+    }
+
     public void clearCache() {
         cachedOllamaSettings = null;
+        cachedModules = null;
     }
 }

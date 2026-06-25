@@ -521,7 +521,10 @@
   width: 8px; height: 8px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 0; background: transparent; cursor: pointer;
+  transition: transform 0.15s;
 }
+button.issue-dot:hover { transform: scale(1.35); }
 .issue-dot--exposure { background: var(--color-warning); }
 .issue-dot--cast     { background: var(--color-info); }
 .issue-dot--noise    { background: var(--color-error); }
@@ -902,7 +905,11 @@
   font-size: 11px;
   font-weight: var(--font-weight-medium);
   border: 1px solid;
+  cursor: pointer;
+  transition: opacity 0.15s;
 }
+.issue-chip:hover { opacity: 0.8; }
+button.issue-chip { font-family: inherit; }
 .issue-chip i { font-size: 11px; }
 /* Issue families */
 .issue-chip--exposure { background: rgba(var(--color-warning-rgb), 0.10); color: var(--color-warning); border-color: rgba(var(--color-warning-rgb), 0.3); }

@@ -13,8 +13,8 @@ export class ApiError extends Error {
 
 export async function apiJson(path, options = {}) {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
   });
   if (!res.ok) throw new ApiError(res.status, await res.text());
   if (res.status === 204) return null;

@@ -4,7 +4,13 @@
 import { defineRoute, init as initRouter, navigate, getCurrentRoute } from "./router.js";
 import { revealNav, moveModeIndicator, buttonPulse, magneticHover } from "./motion.js";
 import { pingHealth } from "./api/client.js";
+import { getModules } from "./api/endpoints/settings.js";
 import * as state from "./state.js";
+
+const DEFAULT_MODULES = {
+  editing: true, aiAssistant: true, batchProcessing: true,
+  rawDecode: true, cameraFeedback: false, styleProfiles: false,
+};
 
 // ---- Theme & accent application ----------------------------------------
 
@@ -194,7 +200,15 @@ function watchSystemTheme() {
 
 // ---- Boot --------------------------------------------------------------
 
-function boot() {
+async function boot() {
+  try {
+    const res = await getModules();
+    const { firstRun = false, modules = {} } = res || {};
+    window.__kuonixConfig = { modules: { ...DEFAULT_MODULES, ...modules }, _firstRun: firstRun };
+  } catch {
+    window.__kuonixConfig = { modules: { ...DEFAULT_MODULES }, _firstRun: false };
+  }
+
   // Apply persisted appearance before first paint of any view.
   applyTheme(state.get("theme"));
   applyAccent(state.get("accent"), state.get("accentHex"));
@@ -210,6 +224,12 @@ function boot() {
 
   // Reveal nav with a small stagger.
   revealNav(document.querySelector(".left-nav"));
+
+  // First-run wizard — shown before routing so the user configures features first.
+  if (window.__kuonixConfig._firstRun) {
+    const { runOnboarding } = await import("./views/onboarding/index.js");
+    await runOnboarding();
+  }
 
   // Start router.
   const outlet = document.getElementById("view-outlet");

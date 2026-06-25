@@ -185,6 +185,7 @@ export async function openSlidersPanel() {
     const m = methods.find((mm) => mm.id === id);
     if (!m) return;
     activeMethodId = id;
+    dirty = true;
     params = {};
     for (const p of m.parameters || []) {
       // Path-style params (e.g. referenceImagePath) have all-zero numeric

@@ -9,7 +9,7 @@
 // Both share the same upload pipeline; the only difference is the layout.
 
 import { gsap } from "../../../node_modules/gsap/index.js";
-import { enterView, isReduced, accentRipple, magneticHover } from "../../motion.js";
+import { enterView, isReduced, accentRipple, magneticHover, dropAreaPulse } from "../../motion.js";
 import * as state from "../../state.js";
 
 import { renderEmptyState, isRawFile } from "./empty-state.js";
@@ -19,6 +19,8 @@ import { createHistogramStrip } from "./histogram.js";
 import { createContactSheet } from "./contact-sheet.js";
 import { createGroupFilter } from "./group-filter.js";
 import { openSlidersPanel } from "../../components/sliders-panel/index.js";
+import { createExifPanel } from "../../components/exif-panel/index.js";
+import { createStyleProfilePanel } from "../../components/style-profile-panel/index.js";
 
 import { uploadJpeg, uploadRaw, decodeStream, classifyStream, getUrls } from "../../api/endpoints/images.js";
 import { toast } from "../../components/toast/index.js";
@@ -88,6 +90,8 @@ function destroyLayout() {
   if (!layout) return;
   layout.ribbon?.destroy?.();
   layout.hist?.destroy?.();
+  layout.exifPanel?.destroy?.();
+  layout.styleProfilePanel?.destroy?.();
   layout.contactUnsub?.();
   layout.groupFilter?.destroy?.();
   layout.activeUnsub?.();
@@ -153,7 +157,21 @@ function mountSingle(view) {
   const hist = createHistogramStrip();
   hist.attach(wrap);
 
-  layout = { kind: "single", ribbon, stage, hist, adjustBtn, adjustUnmagnet: unmagnet };
+  let exifPanel = null;
+  if (window.__kuonixConfig?.modules?.cameraFeedback) {
+    exifPanel = createExifPanel();
+    wrap.appendChild(exifPanel.el);
+    exifPanel.bind();
+  }
+
+  let styleProfilePanel = null;
+  if (window.__kuonixConfig?.modules?.styleProfiles) {
+    styleProfilePanel = createStyleProfilePanel();
+    wrap.appendChild(styleProfilePanel.el);
+    styleProfilePanel.bind();
+  }
+
+  layout = { kind: "single", ribbon, stage, hist, adjustBtn, adjustUnmagnet: unmagnet, exifPanel, styleProfilePanel };
 
   if (!isReduced) {
     gsap.from([stage.el, hist.el], {
@@ -234,6 +252,47 @@ function mountBatch(view) {
   sheet.render();
   const contactUnsub = sheet.bind();
 
+  // Drag-drop zone for adding more files when the batch view is populated.
+  const dropOverlay = document.createElement("div");
+  dropOverlay.setAttribute("aria-hidden", "true");
+  dropOverlay.style.cssText = [
+    "position:absolute;inset:0;z-index:20;display:none",
+    "align-items:center;justify-content:center;gap:10px",
+    "background:rgba(0,0,0,0.55);font-size:1.05rem;color:#fff",
+    "pointer-events:none;border-radius:var(--radius-lg,12px)",
+    "backdrop-filter:blur(4px);letter-spacing:.01em",
+  ].join(";");
+  dropOverlay.innerHTML = `<i class="bi bi-images" style="font-size:1.6rem"></i><span>Drop to add images</span>`;
+  wrap.style.position = "relative";
+  wrap.appendChild(dropOverlay);
+
+  let batchDragDepth = 0;
+  const setBatchDragOver = (on) => {
+    wrap.classList.toggle("is-dragover", on);
+    dropOverlay.style.display = on ? "flex" : "none";
+    dropAreaPulse(wrap, on);
+  };
+  wrap.addEventListener("dragenter", (e) => {
+    e.preventDefault();
+    batchDragDepth++;
+    if (batchDragDepth === 1) setBatchDragOver(true);
+  });
+  wrap.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  });
+  wrap.addEventListener("dragleave", () => {
+    batchDragDepth = Math.max(0, batchDragDepth - 1);
+    if (batchDragDepth === 0) setBatchDragOver(false);
+  });
+  wrap.addEventListener("drop", (e) => {
+    e.preventDefault();
+    batchDragDepth = 0;
+    setBatchDragOver(false);
+    const dropped = Array.from(e.dataTransfer.files || []);
+    if (dropped.length) handleFiles(dropped);
+  });
+
   layout = { kind: "batch", groupFilter, sheet, banner, contactUnsub };
 
   if (!isReduced) {
@@ -285,13 +344,18 @@ async function handleFiles(files) {
   const arr = Array.from(files || []).filter(Boolean);
   if (!arr.length) return;
 
-  const mode = state.get("mode");
-  if (mode === "single") {
-    if (arr.length > 1) toast.info(`Single mode: keeping the first of ${arr.length} files.`);
+  const hasImages = state.get("images").length > 0;
+
+  if (!hasImages) {
+    // Auto-detect mode: 1 file → single, 2+ files → batch.
+    const targetMode = arr.length === 1 ? "single" : "batch";
+    if (state.get("mode") !== targetMode) state.set("mode", targetMode);
+  }
+
+  if (state.get("mode") === "single") {
     state.clearImages();
     await processFile(arr[0]);
   } else {
-    // Batch — process every dropped file in parallel pipelines.
     await Promise.all(arr.map((f) => processFile(f)));
   }
 }
@@ -337,13 +401,16 @@ async function pipelineJpegLike(file, tmpPath, setActivePath) {
 
   // Rekey the slot from tmp → real path. In-place rename avoids the empty→single
   // layout flicker that remove+add would trigger.
-  state.renameImage(tmpPath, path, { state: "uploading" });
+  state.renameImage(tmpPath, path, { state: "uploading", exif: res.exifList?.[0] ?? null });
   setActivePath?.(path);
 
   reportProgress(path, "uploading", 0.5, `Loading ${file.name}…`);
 
   const url = await fetchDataUrl(path);
   if (!url) throw new Error("Could not fetch image.");
+  // Pre-mark _stageSrc so urlUnsub deduplication skips the reactive call —
+  // prevents two competing setImage calls on the same element.
+  if (layout?.kind === "single" && layout._stageSrcSetter) layout._stageSrcSetter(url);
   state.updateImage(path, { url });
 
   if (layout?.kind === "single") {
@@ -362,7 +429,7 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
   // Use the previewPath as the immediate identity. We'll swap to fullPath when
   // decode completes. In-place rename avoids layout flicker.
   state.renameImage(tmpPath, info.previewPath, {
-    taskId: info.taskId, state: "decoding",
+    taskId: info.taskId, state: "decoding", exif: info.exif ?? null,
   });
   setActivePath?.(info.previewPath);
 
@@ -370,6 +437,7 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
 
   const previewUrl = await fetchDataUrl(info.previewPath);
   if (previewUrl) {
+    if (layout?.kind === "single" && layout._stageSrcSetter) layout._stageSrcSetter(previewUrl);
     state.updateImage(info.previewPath, { url: previewUrl });
     if (layout?.kind === "single") {
       await layout.stage?.setImage?.(previewUrl);
@@ -397,6 +465,7 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
 
             const fullUrl = await fetchDataUrl(fullPath);
             if (fullUrl) {
+              if (layout?.kind === "single" && layout._stageSrcSetter) layout._stageSrcSetter(fullUrl);
               state.updateImage(fullPath, { url: fullUrl });
               if (layout?.kind === "single") {
                 await layout.stage?.setImage?.(fullUrl);
@@ -425,8 +494,27 @@ async function analyze(path) {
 
   await new Promise((resolve) => {
     let resolved = false;
-    const finish = () => { if (!resolved) { resolved = true; resolve(); } };
-    const handle = trackHandle(classifyStream([path], {
+    let handle;
+    const finish = () => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeoutId);
+        resolve();
+      }
+    };
+
+    // Hard client-side ceiling — prevents SSE streams from hanging indefinitely
+    // when the backend emitter is never closed (e.g. an uncaught JVM Error that
+    // escapes the catch block leaves the Spring SseEmitter in a dangling state).
+    const timeoutId = setTimeout(() => {
+      handle?.cancel?.();
+      state.updateImage(path, { state: "error" });
+      if (layout?.kind === "single") layout.ribbon?.setError?.("Analysis timed out.");
+      toast.error("Analysis timed out — try again.");
+      finish();
+    }, 90_000);
+
+    handle = trackHandle(classifyStream([path], {
       onEvent: ({ event, data }) => {
         if (event === "progress") {
           const pct = (data?.percentage ?? 0) / 100;
@@ -457,8 +545,6 @@ async function analyze(path) {
         finish();
       },
       onComplete: () => {
-        // Stream ended without a 'complete' or 'error' event (backend error or
-        // silent timeout). Clear the spinner so the card doesn't hang forever.
         const img = state.get("images").find((r) => r.path === path);
         if (img?.state === "analyzing") {
           state.updateImage(path, { state: "error" });
@@ -472,7 +558,12 @@ async function analyze(path) {
 }
 
 function reportProgress(path, kind, progress, text) {
-  // In single mode the ribbon shows progress for the active image.
+  if (layout?.kind === "batch") {
+    // Drive the contact-card progress bar directly — no state mutation needed,
+    // avoids full sheet re-renders on every decode/analyze progress tick.
+    layout.sheet?.updateProgress?.(path, progress);
+    return;
+  }
   if (layout?.kind !== "single") return;
   if (state.get("currentImagePath") !== path) return;
   layout.ribbon?.setStatus?.({ kind, text, progress });

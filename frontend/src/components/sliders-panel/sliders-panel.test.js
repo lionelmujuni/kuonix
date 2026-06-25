@@ -117,6 +117,16 @@ async function flushAll() {
   await Promise.resolve();
 }
 
+// The panel opens on "Select a method to begin" — nothing is auto-selected.
+// Compare/Reset only become meaningful once the user picks a method, which
+// renders its sliders and kicks off the auto-preview. These helpers click the
+// first available method button and wait for that preview to resolve.
+async function selectFirstMethod() {
+  const methodBtn = panelBody.querySelector("[data-method]");
+  methodBtn.click();
+  await flushAll();
+}
+
 describe('sliders-panel — Compare button behaviour', () => {
   let openSlidersPanel;
   let stateModule;
@@ -145,8 +155,16 @@ describe('sliders-panel — Compare button behaviour', () => {
       return null;
     });
 
+    // The real createPanel returns an overlay containing a .panel-backdrop;
+    // openSlidersPanel reaches into it to clear the backdrop on open.
+    const overlay = document.createElement('div');
+    const backdrop = document.createElement('div');
+    backdrop.className = 'panel-backdrop';
+    overlay.appendChild(backdrop);
+
     createPanel.mockImplementation(({ onClose }) => ({
       body: panelBody,
+      overlay,
       open: vi.fn(),
       close: vi.fn().mockImplementation(() => onClose?.()),
       _closeCb: onClose,
@@ -187,6 +205,7 @@ describe('sliders-panel — Compare button behaviour', () => {
   it('Compare button is enabled after auto-preview resolves on method select', async () => {
     await openSlidersPanel();
     await flushAll();
+    await selectFirstMethod();
     const btn = panelBody.querySelector("[data-action='compare']");
     expect(btn.disabled).toBe(false);
   });
@@ -194,6 +213,7 @@ describe('sliders-panel — Compare button behaviour', () => {
   it('Compare pointerdown emits STAGE_SET_IMAGE with the baseline URL', async () => {
     await openSlidersPanel();
     await flushAll();
+    await selectFirstMethod();
     busModule.emit.mockClear();
 
     const btn = panelBody.querySelector("[data-action='compare']");
@@ -208,6 +228,7 @@ describe('sliders-panel — Compare button behaviour', () => {
   it('Compare pointerup restores the preview URL', async () => {
     await openSlidersPanel();
     await flushAll();
+    await selectFirstMethod();
     busModule.emit.mockClear();
 
     const btn = panelBody.querySelector("[data-action='compare']");
@@ -225,6 +246,7 @@ describe('sliders-panel — Compare button behaviour', () => {
   it('Compare is re-disabled after reset', async () => {
     await openSlidersPanel();
     await flushAll();
+    await selectFirstMethod();
 
     // Move a slider to enable the reset button (dirty = true).
     const slider = panelBody.querySelector('.slider__input');
@@ -242,6 +264,7 @@ describe('sliders-panel — Compare button behaviour', () => {
   it('reset emits STAGE_SET_IMAGE with baseline URL', async () => {
     await openSlidersPanel();
     await flushAll();
+    await selectFirstMethod();
 
     // Move a slider to enable the reset button (dirty = true).
     const slider = panelBody.querySelector('.slider__input');

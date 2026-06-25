@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import app.restful.dto.CameraFeedback;
 import app.restful.dto.ClassifyResponse;
+import app.restful.dto.ExifData;
 import app.restful.dto.GroupRequest;
 import app.restful.dto.GroupResult;
 import app.restful.dto.ImageClassifyRequest;
@@ -29,6 +31,9 @@ import app.restful.dto.ImageIssue;
 import app.restful.dto.ImageUrlRequest;
 import app.restful.dto.ImageUrlResponse;
 import app.restful.dto.UploadResponse;
+import app.restful.services.CameraFeedbackService;
+import app.restful.services.ExifCache;
+import app.restful.services.ExifExtractorService;
 import app.restful.services.GroupingService;
 import app.restful.services.ImageAnalysisService;
 import app.restful.services.ImageClassifierService;
@@ -42,14 +47,23 @@ public class ImageAnalysisController {
     private final ImageAnalysisService analysis;
     private final ImageClassifierService classifier;
     private final GroupingService grouping;
+    private final ExifExtractorService exifExtractor;
+    private final ExifCache exifCache;
+    private final CameraFeedbackService cameraFeedback;
     private final java.util.concurrent.Executor analysisExecutor;
 
-    public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis, ImageClassifierService classifier, GroupingService grouping,
+    public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis,
+            ImageClassifierService classifier, GroupingService grouping,
+            ExifExtractorService exifExtractor, ExifCache exifCache,
+            CameraFeedbackService cameraFeedback,
             @org.springframework.beans.factory.annotation.Qualifier("analysisExecutor") java.util.concurrent.Executor analysisExecutor) {
         this.storage = storage;
         this.analysis = analysis;
         this.classifier = classifier;
         this.grouping = grouping;
+        this.exifExtractor = exifExtractor;
+        this.exifCache = exifCache;
+        this.cameraFeedback = cameraFeedback;
         this.analysisExecutor = analysisExecutor;
     }
 
@@ -58,24 +72,33 @@ public class ImageAnalysisController {
     public ResponseEntity<UploadResponse> upload(@RequestParam("files") List<MultipartFile> files) {
         try {
             if (files == null || files.isEmpty()) {
-                return ResponseEntity.badRequest().body(new UploadResponse(false, List.of(), "No files provided"));
+                return ResponseEntity.badRequest().body(new UploadResponse(false, List.of(), List.of(), "No files provided"));
             }
             var paths = storage.saveImages(files);
+            var exifList = paths.stream()
+                    .map(p -> {
+                        var exif = exifExtractor.extract(java.nio.file.Paths.get(p));
+                        exifCache.put(java.nio.file.Paths.get(p), exif);
+                        return exif;
+                    })
+                    .toList();
             System.out.println("Uploaded " + paths.size() + " files to workspace");
-            return ResponseEntity.ok(new UploadResponse(true, paths, "Uploaded"));
+            return ResponseEntity.ok(new UploadResponse(true, paths, exifList, "Uploaded"));
         } catch (Exception e) {
             String msg = e.getClass().getSimpleName() + ": " + e.getMessage();
             System.err.println("Upload error: " + msg);
             e.printStackTrace();
-            return ResponseEntity.badRequest().body(new UploadResponse(false, List.of(), msg));
+            return ResponseEntity.badRequest().body(new UploadResponse(false, List.of(), List.of(), msg));
         }
     }
 
     // Classify by absolute paths with SSE progress updates
     @PostMapping(value = "/classify-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter classifyWithProgress(@RequestBody ImageClassifyRequest req) {
-        SseEmitter emitter = new SseEmitter(300000L); // 5 minute timeout
-        
+        SseEmitter emitter = new SseEmitter(300000L);
+        emitter.onTimeout(emitter::complete);
+        emitter.onError(ignored -> {});
+
         analysisExecutor.execute(() -> {
             try {
                 boolean enableSkin = req.enableSkin();
@@ -115,18 +138,18 @@ public class ImageAnalysisController {
                     .data(response));
                 emitter.complete();
                 
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 try {
-                    String escapedMessage = e.getMessage() != null 
+                    String escapedMessage = e.getMessage() != null
                         ? e.getMessage().replace("\\", "\\\\").replace("\"", "\\\"")
                         : "Unknown error";
                     emitter.send(SseEmitter.event()
                         .name("error")
                         .data("{\"message\":\"" + escapedMessage + "\"}"));
-                } catch (IOException ex) {
-                    // Ignore
-                }
-                emitter.completeWithError(e);
+                } catch (Exception ignored) {}
+                try {
+                    emitter.completeWithError(e);
+                } catch (Exception ignored) {}
             }
         });
         
@@ -196,6 +219,24 @@ public class ImageAnalysisController {
      * @param req Request containing list of absolute file paths
      * @return Response with Base64 data URLs for each image
      */
+    @PostMapping("/camera-feedback")
+    public ResponseEntity<?> cameraFeedback(@RequestBody ImageClassifyRequest req) {
+        try {
+            Map<String, List<CameraFeedback>> result = new java.util.LinkedHashMap<>();
+            for (String p : req.paths()) {
+                Path path = Paths.get(p);
+                if (!java.nio.file.Files.exists(path)) continue;
+                var feats  = analysis.compute(path, req.enableSkin());
+                var labels = classifier.classify(feats);
+                var exif   = exifExtractor.extract(path);
+                result.put(p, cameraFeedback.evaluate(labels, exif));
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PostMapping("/get-urls")
     public ResponseEntity<ImageUrlResponse> getImageUrls(@RequestBody ImageUrlRequest req) {
         try {

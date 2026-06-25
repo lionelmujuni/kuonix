@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import app.restful.dto.AppModules;
 import app.restful.dto.OllamaSettings;
 import app.restful.services.SettingsService;
 
@@ -91,6 +92,27 @@ public class SettingsController {
             new ModelOption("nemotron-3-super:cloud", "Nemotron 3 Super · Free", "NVIDIA agentic model — no paid plan required"),
             new ModelOption("gemma4:31b-cloud",       "Gemma 4 (31B) · Free",    "Google's latest — no paid plan required")
         );
+    }
+
+    @GetMapping("/modules")
+    public ModulesResponse getModules() {
+        boolean firstRun = settingsService.isFirstRun();
+        AppModules m = settingsService.getModules();
+        return new ModulesResponse(m, firstRun);
+    }
+
+    private record ModulesResponse(AppModules modules, boolean firstRun) {}
+
+    @PostMapping("/modules")
+    public ResponseEntity<?> saveModules(@RequestBody AppModules modules) {
+        try {
+            settingsService.saveModules(modules);
+            return ResponseEntity.ok(new SaveResponse(true, "Modules saved.", false));
+        } catch (java.io.IOException e) {
+            log.error("Failed to save modules", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new SaveResponse(false, "Failed to save: " + e.getMessage(), false));
+        }
     }
 
     private record SaveResponse(

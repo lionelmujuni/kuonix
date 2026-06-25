@@ -40,3 +40,10 @@ export function getUrls(paths) {
     body: JSON.stringify({ paths }),
   });
 }
+
+export function getCameraFeedback(paths, { enableSkin = false } = {}) {
+  return apiJson("/images/camera-feedback", {
+    method: "POST",
+    body: JSON.stringify({ paths, enableSkin }),
+  });
+}

@@ -34,7 +34,9 @@ describe('apiJson', () => {
   });
 
   it('throws ApiError with status + body on non-2xx', async () => {
-    fetch.mockResolvedValueOnce(textResponse('boom', { status: 500 }));
+    // Fresh Response per call — a Response body can only be read once, and the
+    // assertion makes two independent apiJson('/fail') calls.
+    fetch.mockImplementation(() => Promise.resolve(textResponse('boom', { status: 500 })));
     await expect(apiJson('/fail')).rejects.toThrow(ApiError);
     await expect(apiJson('/fail').catch(e => e)).resolves.toBeInstanceOf(ApiError);
   });

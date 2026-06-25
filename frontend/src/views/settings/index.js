@@ -8,7 +8,7 @@ import { gsap } from "../../../node_modules/gsap/index.js";
 import { enterView, isReduced, buttonPulse } from "../../motion.js";
 import * as state from "../../state.js";
 import { applyAccent, applyTheme } from "../../app.js";
-import { getOllama, saveOllama, listModels } from "../../api/endpoints/settings.js";
+import { getOllama, saveOllama, listModels, getModules, saveModules } from "../../api/endpoints/settings.js";
 import { toast } from "../../components/toast/index.js";
 
 let ctx = null;
@@ -31,7 +31,9 @@ export function mount(outlet) {
 
   bindAppearance(view);
   bindAiSection(view);
+  bindFeaturesSection(view);
   loadAiSettings(view);
+  loadModuleSettings(view);
 }
 
 export function unmount() {
@@ -67,6 +69,9 @@ function template() {
       </button>
       <button class="settings__tab" data-tab="ai">
         <i class="bi bi-stars"></i> AI · Ollama Cloud
+      </button>
+      <button class="settings__tab" data-tab="features">
+        <i class="bi bi-toggles"></i> Features
       </button>
       <button class="settings__tab" data-tab="about">
         <i class="bi bi-info-circle"></i> About
@@ -184,6 +189,40 @@ function template() {
           <i class="bi bi-arrow-repeat"></i>
           Saved. Restart Kuonix for the new AI settings to take effect.
         </div>
+      </div>
+    </section>
+
+    <section class="settings__section reveal" data-section="features" hidden>
+      <div class="card">
+        <h3 class="card__title">Feature modules</h3>
+        <p class="muted card__hint">Toggle which parts of Kuonix are active. Disabled modules hide their UI entirely. Changes take effect immediately.</p>
+        <div class="module-list" data-module-list>
+          ${[
+            { key: "editing",        icon: "bi-sliders2-vertical", label: "Editing",         desc: "Sliders panel, color correction, commit & export" },
+            { key: "aiAssistant",    icon: "bi-stars",             label: "AI Assistant",    desc: "Conversational agent, analysis, correction suggestions" },
+            { key: "batchProcessing",icon: "bi-images",            label: "Batch processing",desc: "Contact sheet, group filter, multi-image workflows" },
+            { key: "rawDecode",      icon: "bi-camera",            label: "RAW decode",      desc: "CR2/NEF/ARW and other RAW format processing" },
+            { key: "cameraFeedback", icon: "bi-camera2",           label: "Camera feedback", desc: "EXIF-based tips on how camera settings affect results" },
+            { key: "styleProfiles",  icon: "bi-palette",           label: "Style profiles",  desc: "Reference image or portfolio match to guide corrections" },
+          ].map(m => `
+            <div class="module-row">
+              <div class="module-row__info">
+                <i class="bi ${m.icon}"></i>
+                <div>
+                  <strong>${m.label}</strong>
+                  <span>${m.desc}</span>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" data-module="${m.key}">
+                <span class="switch__slider"></span>
+              </label>
+            </div>
+          `).join("")}
+        </div>
+        <p class="muted card__hint" style="margin-top:12px;font-size:11px;">
+          <i class="bi bi-info-circle"></i> Disabled modules can be re-enabled here at any time.
+        </p>
       </div>
     </section>
 
@@ -409,6 +448,23 @@ function template() {
         display: flex; align-items: center; gap: 8px;
       }
       .restart-banner i { color: rgb(var(--accent-color-rgb)); }
+
+      .module-list { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+      .module-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 10px 12px; border-radius: 10px; gap: 12px;
+        transition: background var(--duration-fast) var(--ease-standard);
+      }
+      .module-row:hover { background: var(--color-secondary); }
+      .module-row__info {
+        display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;
+      }
+      .module-row__info .bi {
+        font-size: 16px; color: var(--color-text-secondary); flex-shrink: 0; width: 20px;
+      }
+      .module-row__info div { display: flex; flex-direction: column; gap: 2px; }
+      .module-row__info strong { font-size: 13px; font-weight: 600; color: var(--color-text); }
+      .module-row__info span { font-size: 11px; color: var(--color-text-secondary); line-height: 1.4; }
 
       .kv {
         display: grid; grid-template-columns: 120px 1fr; gap: 8px 16px;
@@ -690,6 +746,48 @@ function setupModelSelect(view) {
   document.addEventListener("click", () => {
     if (!dropdown.hidden) closeModelDropdown(trigger, dropdown);
   });
+}
+
+// ---- Features section --------------------------------------------------
+
+function bindFeaturesSection(view) {
+  view.querySelector("[data-module-list]").addEventListener("change", async (e) => {
+    const toggle = e.target.closest("[data-module]");
+    if (!toggle) return;
+    const key = toggle.dataset.module;
+    const checked = toggle.checked;
+
+    const current = window.__kuonixConfig?.modules || {};
+    const updated = { ...current, [key]: checked };
+    window.__kuonixConfig = { ...window.__kuonixConfig, modules: updated };
+
+    try {
+      await saveModules(updated);
+      toast.success(`${key} ${checked ? "enabled" : "disabled"}.`);
+    } catch (err) {
+      console.error(err);
+      toggle.checked = !checked;
+      window.__kuonixConfig.modules[key] = !checked;
+      toast.error("Could not save module settings.");
+    }
+  });
+}
+
+async function loadModuleSettings(view) {
+  try {
+    const res = await getModules();
+    const modules = res?.modules || res || {};
+    const updated = { ...window.__kuonixConfig?.modules, ...modules };
+    window.__kuonixConfig = { ...window.__kuonixConfig, modules: updated };
+    view.querySelectorAll("[data-module]").forEach((el) => {
+      el.checked = !!updated[el.dataset.module];
+    });
+  } catch {
+    const fallback = window.__kuonixConfig?.modules || {};
+    view.querySelectorAll("[data-module]").forEach((el) => {
+      el.checked = fallback[el.dataset.module] !== false;
+    });
+  }
 }
 
 function markDirty(view) {

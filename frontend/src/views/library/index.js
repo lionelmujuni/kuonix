@@ -10,6 +10,7 @@ import * as state from "../../state.js";
 import { navigate } from "../../router.js";
 import { toast } from "../../components/toast/index.js";
 import { openLightbox } from "../../components/image-lightbox/index.js";
+import { getIssueMeta, issueRgb } from "../../components/issue-meta.js";
 
 let ctx = null;
 let imagesUnsub = null;
@@ -17,22 +18,8 @@ let outletRef = null;
 let particleCleanup = null;
 let emptyAnimated = false;
 
-const ISSUE_LABELS = {
-  ColorCast_Cool:        { label: "Cool cast",        color: "180, 200, 255" },
-  ColorCast_Warm:        { label: "Warm cast",        color: "255, 190, 140" },
-  Underexposed:          { label: "Underexposed",     color: "120, 130, 150" },
-  Overexposed:           { label: "Overexposed",      color: "255, 230, 150" },
-  LowContrast:           { label: "Low contrast",     color: "150, 160, 170" },
-  HighContrast:          { label: "High contrast",    color: "70, 80, 90"   },
-  LowSaturation:         { label: "Low saturation",   color: "180, 180, 200" },
-  HighSaturation:        { label: "Oversaturated",    color: "255, 100, 200" },
-  Noisy:                 { label: "Noisy",            color: "180, 130, 110" },
-  Blurry:                { label: "Blurry",           color: "120, 110, 180" },
-  SkinTone_Off:          { label: "Skin tone off",    color: "230, 170, 150" },
-};
-
-function labelFor(id) { return ISSUE_LABELS[id]?.label || id; }
-function colorFor(id) { return ISSUE_LABELS[id]?.color || "var(--accent-color-rgb)"; }
+function labelFor(id) { return getIssueMeta(id).label; }
+function colorFor(id) { return issueRgb(id); }
 
 export function mount(outlet) {
   outletRef = outlet;

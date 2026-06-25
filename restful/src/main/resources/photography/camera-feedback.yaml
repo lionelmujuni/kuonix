@@ -1,0 +1,180 @@
+---
+# Kuonix camera-feedback knowledge base.
+#
+# PURPOSE — Single source of truth for the in-camera advice shown to
+# photographers when an ImageIssue is detected. CameraKnowledgeBase loads this
+# file at startup; CameraFeedbackService evaluates each issue's EXIF conditions
+# and renders a tip.
+#
+# WHY YAML, NOT JAVA — Keeping the knowledge external lets photographic
+# educators tune wording and add depth without a rebuild, and gives the AI
+# layer (Phase 3) a structured, grounded knowledge source: the `cause`,
+# `physics`, and `levers` fields are the technical facts the model rewrites
+# into a human-toned tip, while `base_tip` / `conditions[].tip` are the
+# deterministic fallback used when AI is unavailable.
+#
+# STRUCTURE — `issues.<ImageIssue>`:
+#   cause       one-line root cause of the issue.
+#   physics     the underlying optical / sensor mechanism (for depth + AI).
+#   levers      camera-side corrective actions, most-impactful first.
+#   severity    default severity when no condition matches: low | medium | high.
+#   base_tip    deterministic tip used when no condition matches.
+#   conditions  ordered list of EXIF-conditional overrides; first match wins:
+#                 when      condition token evaluated by CameraFeedbackService
+#                           (iso_gt_3200 | iso_gt_1600 | iso_lte_800 |
+#                            wb_auto | wb_manual | focal_gt_85)
+#                 severity  severity for this branch.
+#                 tip       advice text; {iso} / {focalLength} are substituted
+#                           from the image's EXIF before display.
+#
+# Only issues with a meaningful in-camera remedy appear here. Purely
+# compositional or post-only issues (contrast, saturation, oversaturation) are
+# intentionally absent — they produce no camera tip.
+
+version: 1
+
+issues:
+
+  Needs_Noise_Reduction:
+    cause: >-
+      Sensor noise is dominating the shadows and flat midtones of the frame.
+    physics: >-
+      Raising ISO amplifies the analog signal before A/D conversion, so photon
+      shot noise and sensor read noise are amplified together; underexposure
+      then stretches those same noisy shadows further during the raw push.
+    levers: [lower ISO, wider aperture, longer exposure, tripod, expose to the right]
+    severity: medium
+    base_tip: >-
+      Reduce ISO to minimise sensor noise. Use a tripod to compensate with a
+      slower shutter.
+    conditions:
+      - when: iso_gt_3200
+        severity: high
+        tip: >-
+          ISO {iso} amplifies sensor noise. Try ISO ≤ 1600 with a wider aperture
+          or longer exposure.
+      - when: iso_lte_800
+        severity: medium
+        tip: >-
+          Noise at ISO {iso} may indicate underexposure. Expose to the right and
+          reduce in post.
+
+  Needs_Exposure_Increase:
+    cause: >-
+      The frame is recording too little light, leaving the tones bunched at the
+      bottom of the histogram.
+    physics: >-
+      Exposure is governed by aperture, shutter speed and ISO; with a fixed ISO
+      the sensor simply did not collect enough photons, so the signal-to-noise
+      ratio in the shadows is poor.
+    levers: [open aperture, slower shutter, positive exposure compensation, add light]
+    severity: low
+    base_tip: >-
+      Apply +1 EV exposure compensation in-camera, or use a wider aperture /
+      slower shutter.
+    conditions:
+      - when: iso_gt_1600
+        severity: medium
+        tip: >-
+          ISO {iso} is already high. Gain more light with a wider aperture
+          (lower f-number) rather than raising ISO further.
+
+  Needs_Exposure_Decrease:
+    cause: >-
+      The frame is recording too much light, pushing tones toward the top of the
+      histogram.
+    physics: >-
+      Overexposure risks clipping the highlight channels irrecoverably; reducing
+      aperture, shutter or ISO brings the signal back into the sensor's range.
+    levers: [narrower aperture, faster shutter, negative exposure compensation]
+    severity: low
+    base_tip: >-
+      Apply −1 EV exposure compensation, use a narrower aperture (higher
+      f-number), or increase shutter speed.
+
+  Clipped_Highlights:
+    cause: >-
+      Bright highlights have blown to pure white with no recoverable detail.
+    physics: >-
+      Once a photosite saturates, its value clips at the sensor's maximum and
+      the information is gone — unlike shadows, clipped highlights cannot be
+      recovered in post.
+    levers: [highlight warnings, negative exposure compensation, expose for highlights, graduated ND]
+    severity: high
+    base_tip: >-
+      Enable highlight warnings on your camera. Dial down −0.7 EV before
+      shooting contrasty scenes.
+
+  Crushed_Shadows:
+    cause: >-
+      The darkest tones have collapsed to black, losing shadow separation.
+    physics: >-
+      The scene's dynamic range exceeded what a single exposure captured, so the
+      shadow end fell below the sensor's noise floor and clipped to black.
+    levers: [fill flash, reflector, positive exposure compensation, bracket and blend]
+    severity: medium
+    base_tip: >-
+      Shadows are clipping. Use fill flash or reflector, or expose +0.5 EV and
+      recover highlights in post.
+
+  Hazy:
+    cause: >-
+      Atmospheric haze is veiling contrast and desaturating the scene.
+    physics: >-
+      Airlight scattered by particles between camera and subject adds a uniform
+      luminance and lifts the black point, flattening contrast — an effect
+      compounded by the depth-compression of long focal lengths.
+    levers: [polarising filter, UV filter, shoot with sun behind you, lower-humidity conditions]
+    severity: low
+    base_tip: >-
+      Use a UV or polarising filter to cut haze in-camera. Avoid backlit shots
+      in humid conditions.
+    conditions:
+      - when: focal_gt_85
+        severity: low
+        tip: >-
+          Telephoto compression amplifies atmospheric haze. Shoot with the sun
+          behind you, or choose lower-humidity conditions.
+
+  ColorCast_Red: &colorcast
+    cause: >-
+      A colour cast from the light source is tinting the whole frame.
+    physics: >-
+      White balance maps the scene's neutral point to grey; when the capture WB
+      does not match the illuminant's colour temperature and tint, every tone is
+      shifted along that axis.
+    levers: [custom white balance, Kelvin mode, grey-card calibration, match WB to light source]
+    severity: low
+    base_tip: >-
+      Set a custom white balance matched to the light source to avoid this cast
+      in-camera.
+    conditions:
+      - when: wb_auto
+        severity: medium
+        tip: >-
+          Auto WB struggled with this light source. Set a custom white balance
+          or use Kelvin mode.
+      - when: wb_manual
+        severity: medium
+        tip: >-
+          Your manual WB preset doesn't match the scene lighting. Re-calibrate
+          with a grey card.
+  ColorCast_Green: *colorcast
+  ColorCast_Blue: *colorcast
+  ColorCast_Cyan: *colorcast
+  ColorCast_Magenta: *colorcast
+  ColorCast_Yellow: *colorcast
+
+  SkinTone_Too_Green: &skintone
+    cause: >-
+      Skin tones are skewing away from natural warmth under the scene lighting.
+    physics: >-
+      Fluorescent and mixed artificial sources have spiky, non-continuous
+      spectra; the camera's white balance cannot neutralise every channel at
+      once, so skin — which the eye judges harshly — drifts off-hue.
+    levers: [match WB to dominant light, custom WB preset, gel mixed sources, avoid fluorescent]
+    severity: medium
+    base_tip: >-
+      Fluorescent or mixed artificial light is skewing skin tones. Set WB to the
+      dominant light source or use a custom preset.
+  SkinTone_Too_Magenta: *skintone

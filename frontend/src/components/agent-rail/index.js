@@ -408,3 +408,13 @@ function stopAgentThinking(bubble) {
 
 // Re-export ripple helper so the edit view can use it on stage updates.
 export { accentRipple };
+
+// Pre-fill the prompt input and focus it — used by the issue drawer's "Ask AI" button.
+export function injectPrompt(text) {
+  if (!promptInput) return;
+  promptInput.value = text;
+  syncReadyState();
+  promptInput.focus();
+  const end = promptInput.value.length;
+  promptInput.setSelectionRange(end, end);
+}

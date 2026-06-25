@@ -13,13 +13,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import app.restful.dto.CameraFeedback;
+import app.restful.dto.ExifData;
 import app.restful.dto.ImageFeatures;
 import app.restful.dto.ImageIssue;
+import app.restful.dto.StyleGap;
+import app.restful.dto.StyleProfile;
 import app.restful.services.AlgorithmKnowledgeGraph;
+import app.restful.services.CameraFeedbackService;
 import app.restful.services.ColorCorrectionService;
+import app.restful.services.ExifCache;
 import app.restful.services.ImageClassifierService;
 import app.restful.services.ImageFeaturesCache;
 import app.restful.services.StorageService;
+import app.restful.services.StyleGapService;
+import app.restful.services.StyleProfileService;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 
@@ -72,19 +80,31 @@ public class KuonixAgentTools {
     private final ColorCorrectionService    correctionService;
     private final StorageService            storageService;
     private final AlgorithmKnowledgeGraph   knowledgeGraph;
+    private final ExifCache                 exifCache;
+    private final CameraFeedbackService     cameraFeedbackService;
+    private final StyleProfileService       styleProfileService;
+    private final StyleGapService           styleGapService;
     private final ObjectMapper              mapper;
 
     public KuonixAgentTools(ImageFeaturesCache featuresCache,
                             ImageClassifierService classifierService,
                             ColorCorrectionService correctionService,
                             StorageService storageService,
-                            AlgorithmKnowledgeGraph knowledgeGraph) {
-        this.featuresCache     = featuresCache;
-        this.classifierService = classifierService;
-        this.correctionService = correctionService;
-        this.storageService    = storageService;
-        this.knowledgeGraph    = knowledgeGraph;
-        this.mapper            = new ObjectMapper();
+                            AlgorithmKnowledgeGraph knowledgeGraph,
+                            ExifCache exifCache,
+                            CameraFeedbackService cameraFeedbackService,
+                            StyleProfileService styleProfileService,
+                            StyleGapService styleGapService) {
+        this.featuresCache        = featuresCache;
+        this.classifierService    = classifierService;
+        this.correctionService    = correctionService;
+        this.storageService       = storageService;
+        this.knowledgeGraph       = knowledgeGraph;
+        this.exifCache            = exifCache;
+        this.cameraFeedbackService = cameraFeedbackService;
+        this.styleProfileService  = styleProfileService;
+        this.styleGapService      = styleGapService;
+        this.mapper               = new ObjectMapper();
     }
 
     // -------------------------------------------------------------------------
@@ -308,6 +328,89 @@ public class KuonixAgentTools {
 
         correctionService.processAndSaveImage(path, outputPath, method, params);
         return "Saved to: " + outputPath.toAbsolutePath();
+    }
+
+    // -------------------------------------------------------------------------
+    // Tool: explainIssue
+    // -------------------------------------------------------------------------
+
+    @Tool("Explain WHY a detected issue appears in the photograph. Returns a structured " +
+          "context object combining the triggering metrics, camera settings (EXIF), " +
+          "in-camera prevention tips, and — if a style profile is configured — how the " +
+          "image compares to the target look. Use this when the user asks why an image " +
+          "looks a certain way, not just what algorithm to apply.")
+    public String explainIssue(
+            @P("Absolute file path of the image") String imagePath,
+            @P("Comma-separated ImageIssue names from classifyIssues, e.g. 'Needs_Noise_Reduction,ColorCast_Blue'") String issuesCsv) {
+
+        Path path = validateWorkspacePath(imagePath);
+        log.info("[agent] explainIssue: {} issues={}", path.getFileName(), issuesCsv);
+
+        ImageFeatures features = featuresCache.get(path, false);
+
+        List<ImageIssue> issues = java.util.Arrays.stream((issuesCsv == null ? "" : issuesCsv).split(","))
+                .map(String::trim).filter(s -> !s.isEmpty())
+                .map(s -> { try { return ImageIssue.valueOf(s); } catch (IllegalArgumentException e) { return null; } })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+
+        ExifData exif = exifCache.get(path);
+
+        List<CameraFeedback> camFeedback = cameraFeedbackService.evaluate(issues, exif);
+
+        StyleGap gap = null;
+        String profileName = null;
+        try {
+            java.util.Optional<StyleProfile> target = styleProfileService.resolveTarget(features);
+            if (target.isPresent()) {
+                profileName = target.get().name();
+                gap = styleGapService.compute(features, target.get());
+            }
+        } catch (Exception e) {
+            log.debug("Style gap skipped: {}", e.getMessage());
+        }
+
+        java.util.LinkedHashMap<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("issues", issues.stream().map(Enum::name).toList());
+        result.put("triggeringMetrics", relevantMetrics(features, issues));
+        if (exif != null) result.put("exif", exif);
+        if (!camFeedback.isEmpty()) result.put("cameraFeedback", camFeedback);
+        if (gap != null) result.put("styleGap", gap);
+        if (profileName != null) result.put("targetProfile", profileName);
+
+        return toJson(result);
+    }
+
+    private Map<String, Object> relevantMetrics(ImageFeatures f, List<ImageIssue> issues) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        boolean exposure  = issues.stream().anyMatch(i -> i.name().contains("Exposure") || i.name().contains("Shadow") || i.name().contains("Highlight"));
+        boolean cast      = issues.stream().anyMatch(i -> i.name().contains("ColorCast"));
+        boolean sat       = issues.stream().anyMatch(i -> i.name().contains("Saturation") || i.name().contains("Oversaturat"));
+        boolean noise     = issues.stream().anyMatch(i -> i.name().contains("Noise"));
+        boolean haze      = issues.stream().anyMatch(i -> i.name().contains("Hazy"));
+        boolean skin      = issues.stream().anyMatch(i -> i.name().contains("Skin"));
+
+        if (exposure || issues.isEmpty()) {
+            m.put("medianY",  round(f.medianY()));
+            m.put("p5Y",      round(f.p5Y()));
+            m.put("p95Y",     round(f.p95Y()));
+            m.put("blackPct", round(f.blackPct()));
+            m.put("whitePct", round(f.whitePct()));
+        }
+        if (cast || issues.isEmpty()) {
+            m.put("labAMean",    round(f.labAMean()));
+            m.put("labBMean",    round(f.labBMean()));
+            m.put("labABDist",   round(f.labABDist()));
+            m.put("castAngleDeg",round(f.castAngleDeg()));
+        }
+        if (sat || issues.isEmpty()) {
+            m.put("meanS", round(f.meanS()));
+            m.put("p95S",  round(f.p95S()));
+        }
+        if (noise) m.put("shadowNoiseRatio", round(f.shadowNoiseRatio()));
+        if (haze)  m.put("darkChannelMean",  round(f.darkChannelMean()));
+        if (skin)  { m.put("skinHueMeanDeg", round(f.skinHueMeanDeg())); m.put("skinSatMean", round(f.skinSatMean())); }
+        return m;
     }
 
     // -------------------------------------------------------------------------

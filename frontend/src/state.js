@@ -19,6 +19,7 @@ const defaults = {
   selectedPaths: [],        // backend paths the user has multiselected (batch only)
   activeIndex: -1,          // index into images[]; -1 if empty
   filterIssue: null,        // group-filter value (e.g. "ColorCast_Cool"); null = all
+  activeProfileId: null,    // selected style profile id; null = none
 
   currentImagePath: null,
   currentImageUrl: null,
@@ -46,7 +47,7 @@ function load() {
 }
 
 // Keys that survive a relaunch. Everything else is runtime/per-session.
-const PERSISTED_KEYS = ["theme", "accent", "accentHex", "mode", "agentRailCollapsed"];
+const PERSISTED_KEYS = ["theme", "accent", "accentHex", "mode", "agentRailCollapsed", "activeProfileId"];
 
 function persist(s) {
   const slice = {};
