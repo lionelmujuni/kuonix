@@ -21,7 +21,7 @@ import java.util.Arrays;
 public class ImageAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(ImageAnalysisService.class);
-    
+
     private final RawProcessingService rawService;
     
     public ImageAnalysisService(RawProcessingService rawService) {

@@ -10,6 +10,7 @@ restful/bin
 .claude/
 CLAUDE.md
 notebooks/
+coverage/
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
