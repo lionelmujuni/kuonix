@@ -16,10 +16,11 @@ export function decodeStream(taskIds, handlers) {
   return eventSourceSse(`/images/decode-stream?${qs}`, handlers);
 }
 
-export function classify(paths, { enableSkin = true } = {}) {
+export function classify(paths, { enableSkin = true, signal } = {}) {
   return apiJson("/images/classify", {
     method: "POST",
     body: JSON.stringify({ paths, enableSkin }),
+    signal,
   });
 }
 
@@ -38,6 +39,16 @@ export function getUrls(paths) {
   return apiJson("/images/get-urls", {
     method: "POST",
     body: JSON.stringify({ paths }),
+  });
+}
+
+// Per-channel OpenCV histograms for the editing histogram panel. advanced=true
+// also returns the contextual hue + dark-channel histograms.
+export function getHistogram(path, { bins = 256, advanced = false, signal } = {}) {
+  return apiJson("/images/histogram", {
+    method: "POST",
+    body: JSON.stringify({ path, bins, advanced }),
+    signal,
   });
 }
 

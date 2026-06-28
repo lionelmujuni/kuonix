@@ -102,7 +102,8 @@ export function createExifPanel() {
     syncFromState();
     const unsubPath   = state.on("currentImagePath", syncFromState);
     const unsubImages = state.on("images", syncFromState);
-    unsub = () => { unsubPath(); unsubImages(); };
+    const unsubImage  = state.on("image", syncFromState);   // active card's exif may arrive via update/rename
+    unsub = () => { unsubPath(); unsubImages(); unsubImage(); };
   }
 
   function destroy() {

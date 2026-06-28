@@ -1,6 +1,8 @@
 package app.restful.services;
 
 import app.restful.dto.ImageFeatures;
+import org.bytedeco.javacpp.FloatPointer;
+import org.bytedeco.javacpp.IntPointer;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.global.opencv_imgproc;
@@ -11,7 +13,6 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 /**
  * Computes image features for classification.
@@ -77,9 +78,14 @@ public class ImageAnalysisService {
 
         Mat y = luminance709(lin); // 0..1
 
-        double p5 = percentile(y, 5);
-        double p95 = percentile(y, 95);
-        double median = percentile(y, 50);
+        // One luma histogram serves all three percentiles — a single native O(N)
+        // pass replaces three full-array sorts of the same data.
+        Mat yHist = hist01(y, null);
+        double p5 = percentileFromHist(yHist, 5);
+        double p95 = percentileFromHist(yHist, 95);
+        double median = percentileFromHist(yHist, 50);
+        yHist.release();
+
         Scalar meanYSc = opencv_core.mean(y);
         double meanY = meanYSc.get(0);
         double stdY = stddev(y);
@@ -99,7 +105,9 @@ public class ImageAnalysisService {
         Mat Sfloat = new Mat();
         S.convertTo(Sfloat, opencv_core.CV_32F, 1.0/255.0, 0.0);
         double meanS = opencv_core.mean(Sfloat).get(0);
-        double p95S = percentile(Sfloat, 95);
+        Mat sHist = hist01(Sfloat, null);
+        double p95S = percentileFromHist(sHist, 95);
+        sHist.release();
 
         boolean overRed      = oversatInHue(Sfloat, H, 345, 360) || oversatInHue(Sfloat, H, 0, 15);
         boolean overYellow   = oversatInHue(Sfloat, H, 45, 70);
@@ -221,15 +229,47 @@ public class ImageAnalysisService {
         return y;
     }
 
-    private static double percentile(Mat mFloat, double p) {
-        float[] arr = new float[(int)mFloat.total()];
-        org.bytedeco.javacpp.indexer.FloatIndexer indexer = mFloat.createIndexer();
-        indexer.get(0L, arr);
-        indexer.close();
-        Arrays.sort(arr);
-        int index = (int)Math.round((p/100.0) * (arr.length - 1));
-        index = Math.max(0, Math.min(arr.length-1, index));
-        return arr[index];
+    /** Histogram bins for percentile estimation over [0, 1]. 1024 → ~0.001 error. */
+    private static final int HIST_BINS = 1024;
+    /** Upper range nudged past 1.0 so pixels at exactly 1.0 are counted (calcHist ranges are half-open). */
+    private static final float HIST_UPPER = 1.0001f;
+
+    /**
+     * Histogram of a single-channel {@code src} (values in [0,1]) over an
+     * optional {@code mask}. One native O(N) pass; reuse it for every percentile
+     * needed from the same data instead of allocating a {@code float[N]} and
+     * sorting per call.
+     */
+    private static Mat hist01(Mat src, Mat mask) {
+        Mat hist = new Mat();
+        opencv_imgproc.calcHist(
+                src, 1, new IntPointer(new int[]{0}),
+                mask == null ? new Mat() : mask,
+                hist, 1, new IntPointer(new int[]{HIST_BINS}),
+                new FloatPointer(new float[]{0f, HIST_UPPER}));
+        return hist;
+    }
+
+    /**
+     * Percentile {@code p} (0..100) read from a cumulative {@link #hist01}
+     * histogram: the centre of the bin where the running count first reaches the
+     * target, mapped back to [0,1]. O(bins) and never touches the pixel buffer.
+     */
+    private static double percentileFromHist(Mat hist, double p) {
+        int bins = (int) hist.total();
+        org.bytedeco.javacpp.indexer.FloatIndexer idx = hist.createIndexer();
+        double total = 0.0;
+        for (int i = 0; i < bins; i++) total += idx.get(i, 0);
+        if (total <= 0.0) { idx.close(); return 0.0; }
+        double target = (p / 100.0) * total;
+        double cum = 0.0;
+        int bin = bins - 1;
+        for (int i = 0; i < bins; i++) {
+            cum += idx.get(i, 0);
+            if (cum >= target) { bin = i; break; }
+        }
+        idx.close();
+        return (bin + 0.5) * HIST_UPPER / bins;
     }
 
     private static double stddev(Mat mFloat) {
@@ -263,28 +303,30 @@ public class ImageAnalysisService {
         // We'll use 0..360 degrees on-the-fly: convert H to deg*2
         Mat H32 = new Mat();
         H.convertTo(H32, opencv_core.CV_32F, 2.0, 0.0); // 0..360
-        Mat range = new Mat();
-        Mat mask;
+        Mat lo = new Mat(H32.size(), H32.type(), new Scalar(hmin));
+        Mat hi = new Mat(H32.size(), H32.type(), new Scalar(hmax));
+        Mat ge = new Mat(); Mat le = new Mat();
+        opencv_core.compare(H32, lo, ge, opencv_core.CMP_GE);
+        opencv_core.compare(H32, hi, le, opencv_core.CMP_LE);
+        Mat mask = new Mat();
         if (hmin <= hmax) {
-            Mat ge = new Mat(); Mat le = new Mat();
-            opencv_core.compare(H32, new Mat(H32.size(), H32.type(), new Scalar(hmin)), ge, opencv_core.CMP_GE);
-            opencv_core.compare(H32, new Mat(H32.size(), H32.type(), new Scalar(hmax)), le, opencv_core.CMP_LE);
-            mask = new Mat(); opencv_core.bitwise_and(ge, le, mask);
-            ge.release(); le.release();
+            opencv_core.bitwise_and(ge, le, mask);
         } else {
-            Mat ge = new Mat(); Mat le = new Mat(); Mat part = new Mat();
-            opencv_core.compare(H32, new Mat(H32.size(), H32.type(), new Scalar(hmin)), ge, opencv_core.CMP_GE);
-            opencv_core.compare(H32, new Mat(H32.size(), H32.type(), new Scalar(hmax)), le, opencv_core.CMP_LE);
-            mask = new Mat(); opencv_core.bitwise_or(ge, le, mask);
-            ge.release(); le.release(); part.release();
+            opencv_core.bitwise_or(ge, le, mask);
         }
-        // gather S in mask
-        Mat Smasked = new Mat();
-        Sfloat.copyTo(Smasked, mask);
-        boolean any = opencv_core.countNonZero(mask) > 0;
-        double p95 = any ? percentile(Smasked, 95) : 0.0;
+        lo.release(); hi.release(); ge.release(); le.release();
 
-        H32.release(); mask.release(); Smasked.release();
+        // p95 of saturation within the sector, straight from a masked histogram —
+        // no copyTo + sort of the gathered pixels.
+        boolean any = opencv_core.countNonZero(mask) > 0;
+        double p95 = 0.0;
+        if (any) {
+            Mat hist = hist01(Sfloat, mask);
+            p95 = percentileFromHist(hist, 95);
+            hist.release();
+        }
+
+        H32.release(); mask.release();
         return any && p95 >= 0.90;
     }
 
@@ -296,96 +338,33 @@ public class ImageAnalysisService {
 
     private static double shadowResidualRatio(Mat y, Mat shadowMask) {
         if (opencv_core.countNonZero(shadowMask) == 0) return 0.0;
-        
+
         // Gaussian blur residual
         Mat yU8 = new Mat();
         y.convertTo(yU8, opencv_core.CV_8U, 255.0, 0.0);
-        
+
         Mat blur = new Mat();
         opencv_imgproc.GaussianBlur(yU8, blur, new Size(0,0), 1.2);
-        
+
         Mat resid = new Mat();
         // Use empty mask parameter - fourth parameter should be noArray() not new Mat()
         opencv_core.subtract(yU8, blur, resid, new Mat(), opencv_core.CV_32F);
         resid.convertTo(resid, opencv_core.CV_32F, 1.0/255.0, 0.0);
-        
-        // Ensure resid is single channel and same size as shadowMask
-        if (resid.channels() != 1) {
-            Mat gray = new Mat();
-            opencv_imgproc.cvtColor(resid, gray, opencv_imgproc.COLOR_BGR2GRAY);
-            resid.release();
-            resid = gray;
-        }
-        
-        // Validate dimensions match
-        if (resid.rows() != shadowMask.rows() || resid.cols() != shadowMask.cols()) {
-            System.err.println(String.format(
-                "Size mismatch in shadowResidualRatio: resid=%dx%d, mask=%dx%d",
-                resid.cols(), resid.rows(), shadowMask.cols(), shadowMask.rows()
-            ));
-            yU8.release(); blur.release(); resid.release();
-            return 0.0;
-        }
-        
-        // collect residuals under mask
-        float[] arr = maskedToArray(resid, shadowMask);
-        double std = stddev(arr);
+
+        // Std of the residual under the shadow mask in a single native call —
+        // replaces the per-pixel Java scan that materialised and re-collected the
+        // whole frame. (Population std, matching stddev(Mat) used for stdY.)
+        Mat mean = new Mat();
+        Mat sd = new Mat();
+        opencv_core.meanStdDev(resid, mean, sd, shadowMask);
+        org.bytedeco.javacpp.indexer.DoubleIndexer sdIdx = sd.createIndexer();
+        double std = sdIdx.get(0, 0);
+        sdIdx.close();
+
         double meanShadow = meanMasked(y, shadowMask);
-        
-        yU8.release(); blur.release(); resid.release();
+
+        yU8.release(); blur.release(); resid.release(); mean.release(); sd.release();
         return std / Math.max(1e-3, meanShadow);
-    }
-
-    private static float[] maskedToArray(Mat m, Mat mask) {
-        // Ensure both matrices have same total elements
-        int total = (int)m.total();
-        int maskTotal = (int)mask.total();
-        
-        if (total != maskTotal) {
-            throw new IllegalArgumentException(
-                String.format("Matrix size mismatch: m.total()=%d, mask.total()=%d. Dimensions: m=%dx%d, mask=%dx%d", 
-                    total, maskTotal, m.cols(), m.rows(), mask.cols(), mask.rows())
-            );
-        }
-        
-        float[] src = new float[total];
-        org.bytedeco.javacpp.indexer.FloatIndexer fidx = m.createIndexer();
-        fidx.get(0L, src);
-        fidx.close();
-        
-        byte[] mk = new byte[total];
-        org.bytedeco.javacpp.indexer.UByteIndexer bidx = mask.createIndexer();
-        int rows = mask.rows();
-        int cols = mask.cols();
-        for (int i = 0; i < total; i++) {
-            int row = i / cols;
-            int col = i % cols;
-            mk[i] = (byte)bidx.get(row, col);
-        }
-        bidx.close();
-        
-        int count = 0;
-        for (int i = 0; i < total; i++) {
-            if ((mk[i] & 0xFF) != 0) count++;
-        }
-        
-        float[] out = new float[count];
-        int j = 0;
-        for (int i = 0; i < total; i++) {
-            if ((mk[i] & 0xFF) != 0) out[j++] = src[i];
-        }
-        return out;
-    }
-
-    private static double stddev(float[] arr) {
-        if (arr.length==0) return 0.0;
-        double mean = 0.0;
-        for (float v: arr) mean += v;
-        mean /= arr.length;
-        double var = 0.0;
-        for (float v: arr) { double d = v-mean; var += d*d; }
-        var /= Math.max(1, arr.length-1);
-        return Math.sqrt(var);
     }
 
     private static double meanMasked(Mat m, Mat mask) {

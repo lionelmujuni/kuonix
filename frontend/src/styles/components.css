@@ -566,6 +566,7 @@ button.issue-dot:hover { transform: scale(1.35); }
 /* Per-state tints overlaying the card */
 .contact-card.is-state-uploading::after,
 .contact-card.is-state-decoding::after,
+.contact-card.is-state-queued::after,
 .contact-card.is-state-analyzing::after {
   content: "";
   position: absolute; inset: 0;

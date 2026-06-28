@@ -91,7 +91,18 @@ function emit(key, value) {
 // All edit-view code goes through these so the currentImage* mirrors and the
 // "images" listener stay in sync automatically.
 
+// Coarse signal: the *set* of images changed (added / removed / cleared).
+// Consumers that only care about membership (view empty↔populated, library grid)
+// listen here.
 function emitImagesChanged() { emit("images", state.images); }
+
+// Granular signal: one existing card's content or identity changed. Hot-path
+// consumers (contact sheet, group filter) patch the single affected card instead
+// of rebuilding the whole grid — this is what keeps a batch upload from
+// re-rendering every card on every progress tick.
+//   kind: "updated" — same path, new fields (url/state/issues/features…)
+//   kind: "renamed" — path changed in place (oldPath → path)
+function emitImage(path, kind, oldPath = null) { emit("image", { path, kind, oldPath }); }
 
 function syncActiveSnapshot() {
   const img = state.images[state.activeIndex] || null;
@@ -114,11 +125,12 @@ export function addImage(record) {
   const idx = state.images.findIndex((r) => r.path === record.path);
   if (idx >= 0) {
     state.images[idx] = { ...state.images[idx], ...record };
+    emitImage(record.path, "updated");      // merge into an existing card
   } else {
     state.images.push({ selected: true, addedAt: Date.now(), ...record });
     if (state.activeIndex < 0) state.activeIndex = state.images.length - 1;
+    emitImagesChanged();                     // new card → membership change
   }
-  emitImagesChanged();
   syncActiveSnapshot();
   emit("selectedPaths", getSelectedPaths());
 }
@@ -127,7 +139,7 @@ export function updateImage(path, patch) {
   const idx = state.images.findIndex((r) => r.path === path);
   if (idx < 0) return;
   state.images[idx] = { ...state.images[idx], ...patch };
-  emitImagesChanged();
+  emitImage(path, "updated");
   if (idx === state.activeIndex) syncActiveSnapshot();
 }
 
@@ -139,7 +151,7 @@ export function renameImage(oldPath, newPath, patch = {}) {
   const i = state.images.findIndex((r) => r.path === oldPath);
   if (i < 0) return false;
   state.images[i] = { ...state.images[i], ...patch, path: newPath };
-  emitImagesChanged();
+  emitImage(newPath, "renamed", oldPath);
   if (i === state.activeIndex) syncActiveSnapshot();
   return true;
 }
@@ -150,8 +162,9 @@ export function renameImage(oldPath, newPath, patch = {}) {
 export function renameActiveImage(newPath, patch = {}) {
   const i = state.activeIndex;
   if (i < 0) return;
+  const oldPath = state.images[i].path;
   state.images[i] = { ...state.images[i], ...patch, path: newPath };
-  emitImagesChanged();
+  emitImage(newPath, "renamed", oldPath);
   syncActiveSnapshot();
 }
 

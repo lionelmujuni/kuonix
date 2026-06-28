@@ -11,23 +11,29 @@ export function createGroupFilter() {
   root.className = "group-filter";
   root.setAttribute("aria-label", "Filter by issue");
 
-  function render() {
+  // id ("" === All) → { el, countEl }
+  let chipEls = new Map();
+
+  function computeChips() {
     const images = state.get("images");
     const counts = new Map();
     for (const img of images) {
       const arr = Array.isArray(img.issues) ? img.issues : [];
       for (const issue of arr) counts.set(issue, (counts.get(issue) || 0) + 1);
     }
-    const total = images.length;
-    const filter = state.get("filterIssue");
-
     const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-    const chips = [
-      { id: null, label: "All", count: total },
+    return [
+      { id: null, label: "All", count: images.length },
       ...sorted.map(([id, count]) => ({ id, label: getIssueMeta(id).label, count })),
     ];
+  }
 
+  // Full rebuild — only when the *set* of chips changes (an issue appears or
+  // disappears). Animates the chips in.
+  function rebuild(chips) {
+    const filter = state.get("filterIssue");
     root.innerHTML = "";
+    chipEls = new Map();
     chips.forEach((chip) => {
       const el = document.createElement("button");
       el.className = "group-chip" + (chip.id === filter ? " is-active" : "");
@@ -41,10 +47,13 @@ export function createGroupFilter() {
         state.setFilterIssue(chip.id);
         if (chip.id) {
           // Quality of life: clicking a chip selects the matching set.
-          for (const img of images) state.toggleSelected(img.path, (img.issues || []).includes(chip.id));
+          for (const img of state.get("images")) {
+            state.toggleSelected(img.path, (img.issues || []).includes(chip.id));
+          }
         }
       });
       root.appendChild(el);
+      chipEls.set(chip.id ?? "", { el, countEl: el.querySelector(".group-chip__count") });
     });
 
     if (!isReduced) {
@@ -55,9 +64,30 @@ export function createGroupFilter() {
     }
   }
 
+  // Cheap update — same chips, just refreshed counts + active highlight. No DOM
+  // teardown, no animation, so analysis ticks don't make the chips flicker.
+  function patch(chips) {
+    const filter = state.get("filterIssue");
+    for (const chip of chips) {
+      const ref = chipEls.get(chip.id ?? "");
+      if (!ref) return;
+      if (ref.countEl.textContent !== String(chip.count)) ref.countEl.textContent = chip.count;
+      ref.el.classList.toggle("is-active", chip.id === filter);
+    }
+  }
+
+  function render() {
+    const chips = computeChips();
+    const ids = chips.map((c) => c.id ?? "");
+    const sameSet = ids.length === chipEls.size && ids.every((id) => chipEls.has(id));
+    if (sameSet) patch(chips);
+    else rebuild(chips);
+  }
+
   const unsubs = [
-    state.on("images", render),
-    state.on("filterIssue", render),
+    state.on("images", render),       // membership: chip set may change
+    state.on("image", render),        // a card's issues changed → counts
+    state.on("filterIssue", render),  // active highlight
   ];
 
   render();

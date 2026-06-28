@@ -25,6 +25,7 @@ import app.restful.dto.ClassifyResponse;
 import app.restful.dto.ExifData;
 import app.restful.dto.GroupRequest;
 import app.restful.dto.GroupResult;
+import app.restful.dto.HistogramRequest;
 import app.restful.dto.ImageClassifyRequest;
 import app.restful.dto.ImageClassifyResult;
 import app.restful.dto.ImageIssue;
@@ -35,6 +36,7 @@ import app.restful.services.CameraFeedbackService;
 import app.restful.services.ExifCache;
 import app.restful.services.ExifExtractorService;
 import app.restful.services.GroupingService;
+import app.restful.services.HistogramService;
 import app.restful.services.ImageAnalysisService;
 import app.restful.services.ImageClassifierService;
 import app.restful.services.StorageService;
@@ -50,12 +52,13 @@ public class ImageAnalysisController {
     private final ExifExtractorService exifExtractor;
     private final ExifCache exifCache;
     private final CameraFeedbackService cameraFeedback;
+    private final HistogramService histogramService;
     private final java.util.concurrent.Executor analysisExecutor;
 
     public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis,
             ImageClassifierService classifier, GroupingService grouping,
             ExifExtractorService exifExtractor, ExifCache exifCache,
-            CameraFeedbackService cameraFeedback,
+            CameraFeedbackService cameraFeedback, HistogramService histogramService,
             @org.springframework.beans.factory.annotation.Qualifier("analysisExecutor") java.util.concurrent.Executor analysisExecutor) {
         this.storage = storage;
         this.analysis = analysis;
@@ -64,6 +67,7 @@ public class ImageAnalysisController {
         this.exifExtractor = exifExtractor;
         this.exifCache = exifCache;
         this.cameraFeedback = cameraFeedback;
+        this.histogramService = histogramService;
         this.analysisExecutor = analysisExecutor;
     }
 
@@ -234,6 +238,30 @@ public class ImageAnalysisController {
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Per-channel OpenCV histograms for the editing histogram panel. The
+     * frontend renders these instead of computing a luminance histogram from
+     * canvas pixels; advanced=true adds the contextual hue + dark-channel data.
+     */
+    @PostMapping("/histogram")
+    public ResponseEntity<?> histogram(@RequestBody HistogramRequest req) {
+        try {
+            if (req == null || req.path() == null || req.path().isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "path is required"));
+            }
+            int bins = req.bins() != null ? Math.max(16, Math.min(256, req.bins())) : 256;
+            boolean advanced = Boolean.TRUE.equals(req.advanced());
+            var data = histogramService.compute(Paths.get(req.path()), bins, advanced);
+            return ResponseEntity.ok(data);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            String msg = e.getClass().getSimpleName() + ": " + e.getMessage();
+            System.err.println("Histogram error: " + msg);
+            return ResponseEntity.badRequest().body(Map.of("error", msg));
         }
     }
 

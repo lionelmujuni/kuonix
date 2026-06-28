@@ -126,7 +126,7 @@ export function createContactSheet({ onAddMore } = {}) {
     const img = state.get("images").find((r) => r.path === path);
     if (!img) return;
     const card = cardByPath.get(path);
-    if (!card) { render(); return; }   // fall back to full re-render if filter changed
+    if (!card) { reconcile(); return; }   // not shown yet — let the reconciler place it
     card.classList.toggle("is-selected", !!img.selected);
     card.classList.toggle("is-active", img.path === state.get("currentImagePath"));
     // State class swap
@@ -144,10 +144,90 @@ export function createContactSheet({ onAddMore } = {}) {
     renderCardMeta(card, img);
   }
 
+  // Reconcile the grid against the visible set after a *membership* change
+  // (add / remove / clear / filter). Existing cards are left in place — only new
+  // cards are created (and animated) and gone cards removed — so a card that is
+  // merely updating mid-upload never gets torn down and re-faded.
+  function reconcile() {
+    const images = state.visibleImages();
+
+    if (!images.length) {
+      grid.innerHTML = `
+        <div class="contact-sheet__empty">
+          <i class="bi bi-images"></i>
+          <p>No images match this filter.</p>
+        </div>`;
+      cardByPath.clear();
+      syncCount();
+      return;
+    }
+
+    const emptyEl = grid.querySelector(".contact-sheet__empty");
+    if (emptyEl) emptyEl.remove();
+
+    const seen = new Set();
+    const added = [];
+    let prev = null;
+    for (const img of images) {
+      seen.add(img.path);
+      let card = cardByPath.get(img.path);
+      if (!card) {
+        card = makeCard(img);
+        cardByPath.set(img.path, card);
+        added.push(card);
+      }
+      // Keep DOM order in sync with the visible array.
+      const ref = prev ? prev.nextSibling : grid.firstChild;
+      if (ref !== card) grid.insertBefore(card, ref);
+      prev = card;
+    }
+
+    for (const path of [...cardByPath.keys()]) {
+      if (!seen.has(path)) {
+        cardByPath.get(path).remove();
+        cardByPath.delete(path);
+      }
+    }
+
+    if (added.length && !isReduced) {
+      gsap.from(added, {
+        opacity: 0, y: 8, scale: 0.97,
+        duration: 0.35, ease: "expo.out",
+        stagger: { each: 0.04, from: "start" },
+        clearProps: "transform",
+      });
+    }
+    syncCount();
+  }
+
+  // A single existing card changed content (updated) or identity (renamed).
+  function onImageEvent({ path, kind, oldPath } = {}) {
+    if (kind === "renamed") {
+      const card = cardByPath.get(oldPath);
+      const img = state.get("images").find((r) => r.path === path);
+      if (!card || !img) { reconcile(); return; }   // wasn't shown — let reconcile place it
+      // Rebuild this one card so its click/keyboard closures bind to the new
+      // path, then swap it in place (no entrance animation → no flicker).
+      const fresh = makeCard(img);
+      card.replaceWith(fresh);
+      cardByPath.delete(oldPath);
+      cardByPath.set(path, fresh);
+      syncCount();
+      return;
+    }
+    // "updated": with an active filter, new issues can change visibility.
+    if (state.get("filterIssue")) {
+      const visible = state.visibleImages().some((r) => r.path === path);
+      if (visible !== cardByPath.has(path)) { reconcile(); return; }
+    }
+    patchCard(path);
+  }
+
   function bind() {
     const unsubs = [
-      state.on("images", render),
-      state.on("filterIssue", render),
+      state.on("images", reconcile),     // membership: add / remove / clear
+      state.on("image", onImageEvent),   // granular: one card updated / renamed
+      state.on("filterIssue", render),   // filter switch → deliberate full re-render
       state.on("activeIndex", () => {
         for (const card of cardByPath.values()) {
           card.classList.toggle("is-active", card.dataset.path === state.get("currentImagePath"));
@@ -165,11 +245,12 @@ export function createContactSheet({ onAddMore } = {}) {
   }
 
   function renderCardMeta(card, img) {
-    const isBusy = img.state === "uploading" || img.state === "decoding" || img.state === "analyzing";
+    const isBusy = img.state === "uploading" || img.state === "decoding"
+      || img.state === "queued" || img.state === "analyzing";
     card.classList.toggle("is-busy", isBusy);
     const issuesEl = card.querySelector(".contact-card__issues");
     if (isBusy) {
-      const labels = { uploading: "Uploading…", decoding: "Decoding…", analyzing: "Analyzing…" };
+      const labels = { uploading: "Uploading…", decoding: "Decoding…", queued: "Queued…", analyzing: "Analyzing…" };
       issuesEl.innerHTML = `<span class="contact-card__state-label">${labels[img.state] || ""}</span>`;
     } else {
       issuesEl.innerHTML = "";

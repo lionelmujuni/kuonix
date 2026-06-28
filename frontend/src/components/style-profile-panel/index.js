@@ -322,8 +322,9 @@ export function createStyleProfilePanel() {
     if (expanded) loadProfiles();
     const unsubPath    = state.on("currentImagePath", scheduleGapFetch);
     const unsubImages  = state.on("images", scheduleGapFetch);
+    const unsubImage   = state.on("image", scheduleGapFetch);   // active card reaching "ready" arrives as a granular update
     const unsubProfile = state.on("activeProfileId", () => { gapData = null; renderBody(); scheduleGapFetch(); });
-    unsubs = [unsubPath, unsubImages, unsubProfile];
+    unsubs = [unsubPath, unsubImages, unsubImage, unsubProfile];
   }
 
   function destroy() {

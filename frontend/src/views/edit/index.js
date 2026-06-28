@@ -21,8 +21,10 @@ import { createGroupFilter } from "./group-filter.js";
 import { openSlidersPanel } from "../../components/sliders-panel/index.js";
 import { createExifPanel } from "../../components/exif-panel/index.js";
 import { createStyleProfilePanel } from "../../components/style-profile-panel/index.js";
+import { createHistogramPanel } from "../../components/histogram-panel/index.js";
 
-import { uploadJpeg, uploadRaw, decodeStream, classifyStream, getUrls } from "../../api/endpoints/images.js";
+import { uploadJpeg, uploadRaw, decodeStream, getUrls } from "../../api/endpoints/images.js";
+import { createAnalysisQueue } from "./analysis-queue.js";
 import { toast } from "../../components/toast/index.js";
 import { on, EVENTS } from "../../bus.js";
 
@@ -36,6 +38,7 @@ let layout = null;          // { kind: "empty"|"single"|"batch", ...refs }
 let busUnsubs = [];
 
 let activeHandles = [];     // [{ cancel() }] in-flight per-file SSE handles
+let analysisQueue = null;   // concurrent decode→analyze scheduler (created on mount)
 
 function trackHandle(h) { if (h) activeHandles.push(h); return h; }
 function killHandles() {
@@ -52,6 +55,14 @@ function unbindBus() {
 export function mount(outlet) {
   outletRef = outlet;
   outlet.innerHTML = "";
+
+  // One scheduler for the whole edit session — shared by the initial drop and
+  // any later "add more", so a second batch streams into the same worker pool.
+  analysisQueue = createAnalysisQueue({
+    onItemStart: ({ path }) => reportProgress(path, "analyzing", 0.85, "Reading exposure, color, noise…"),
+    onResult: onAnalysisResult,
+    onProgress: updateBatchBanner,
+  });
 
   const view = document.createElement("section");
   view.className = "view edit-view";
@@ -77,6 +88,8 @@ export function mount(outlet) {
 
 export function unmount() {
   killHandles();
+  analysisQueue?.cancel();
+  analysisQueue = null;
   unbindBus();
   modeUnsub?.(); modeUnsub = null;
   imagesUnsub?.(); imagesUnsub = null;
@@ -90,6 +103,7 @@ function destroyLayout() {
   if (!layout) return;
   layout.ribbon?.destroy?.();
   layout.hist?.destroy?.();
+  layout.histogramPanel?.destroy?.();
   layout.exifPanel?.destroy?.();
   layout.styleProfilePanel?.destroy?.();
   layout.contactUnsub?.();
@@ -157,6 +171,12 @@ function mountSingle(view) {
   const hist = createHistogramStrip();
   hist.attach(wrap);
 
+  // OpenCV-backed histogram dropdown (multi-channel + contextual). Sits with the
+  // other collapsible side panels.
+  const histogramPanel = createHistogramPanel();
+  wrap.appendChild(histogramPanel.el);
+  histogramPanel.bind();
+
   let exifPanel = null;
   if (window.__kuonixConfig?.modules?.cameraFeedback) {
     exifPanel = createExifPanel();
@@ -171,7 +191,7 @@ function mountSingle(view) {
     styleProfilePanel.bind();
   }
 
-  layout = { kind: "single", ribbon, stage, hist, adjustBtn, adjustUnmagnet: unmagnet, exifPanel, styleProfilePanel };
+  layout = { kind: "single", ribbon, stage, hist, histogramPanel, adjustBtn, adjustUnmagnet: unmagnet, exifPanel, styleProfilePanel };
 
   if (!isReduced) {
     gsap.from([stage.el, hist.el], {
@@ -295,6 +315,9 @@ function mountBatch(view) {
 
   layout = { kind: "batch", groupFilter, sheet, banner, contactUnsub };
 
+  // If a batch is already analysing when this view (re)mounts, show its progress.
+  if (analysisQueue) updateBatchBanner(analysisQueue.stats());
+
   if (!isReduced) {
     gsap.from([groupFilter.el, sheet.el], {
       opacity: 0, y: 8, duration: 0.35, ease: "expo.out", stagger: 0.06,
@@ -352,6 +375,9 @@ async function handleFiles(files) {
     if (state.get("mode") !== targetMode) state.set("mode", targetMode);
   }
 
+  // Each file uploads + decodes independently and enqueues itself for analysis
+  // the moment it is ready. The analysis pool drains the queue concurrently, so
+  // decoding and analysis overlap — fast files don't wait on the slowest RAW.
   if (state.get("mode") === "single") {
     state.clearImages();
     await processFile(arr[0]);
@@ -381,6 +407,7 @@ async function processFile(file) {
   });
 
   try {
+    // Each pipeline enqueues the decoded path for analysis as soon as it's ready.
     if (isRawFile(file)) {
       await pipelineRaw(file, tmpPath, setActivePath);
     } else {
@@ -418,7 +445,7 @@ async function pipelineJpegLike(file, tmpPath, setActivePath) {
     layout.hist?.updateFromImageSrc?.(url);
   }
 
-  await analyze(path);
+  analysisQueue?.enqueue(path);
 }
 
 async function pipelineRaw(file, tmpPath, setActivePath) {
@@ -485,76 +512,42 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
     }));
   });
 
-  await analyze(activeFinalPath);
+  // Decoded (full-res, or preview if the full decode failed) → ready to analyse.
+  analysisQueue?.enqueue(activeFinalPath);
 }
 
-async function analyze(path) {
-  state.updateImage(path, { state: "analyzing" });
-  reportProgress(path, "analyzing", 0.78, "Analyzing…");
+// Per-image analysis result from the queue. State is already patched by the
+// queue; here we only drive the single-mode ribbon/histogram for the active
+// image and surface failures.
+function onAnalysisResult({ path, ok, error }) {
+  if (layout?.kind === "single" && state.get("currentImagePath") === path) {
+    const img = state.get("images").find((r) => r.path === path);
+    if (ok) {
+      layout.ribbon?.setIssues?.(img?.issues || []);
+      layout.hist?.setMetrics?.(img?.features || {});
+    } else {
+      layout.ribbon?.setError?.(error?.name === "AbortError" ? "Analysis timed out." : "Analysis failed.");
+    }
+  }
+  if (!ok && error?.name !== "AbortError") {
+    // Keep it quiet for single failures in a large batch; a console note is enough.
+    console.warn("analysis failed for", path, error);
+  }
+}
 
-  await new Promise((resolve) => {
-    let resolved = false;
-    let handle;
-    const finish = () => {
-      if (!resolved) {
-        resolved = true;
-        clearTimeout(timeoutId);
-        resolve();
-      }
-    };
-
-    // Hard client-side ceiling — prevents SSE streams from hanging indefinitely
-    // when the backend emitter is never closed (e.g. an uncaught JVM Error that
-    // escapes the catch block leaves the Spring SseEmitter in a dangling state).
-    const timeoutId = setTimeout(() => {
-      handle?.cancel?.();
-      state.updateImage(path, { state: "error" });
-      if (layout?.kind === "single") layout.ribbon?.setError?.("Analysis timed out.");
-      toast.error("Analysis timed out — try again.");
-      finish();
-    }, 90_000);
-
-    handle = trackHandle(classifyStream([path], {
-      onEvent: ({ event, data }) => {
-        if (event === "progress") {
-          const pct = (data?.percentage ?? 0) / 100;
-          reportProgress(path, "analyzing", 0.78 + pct * 0.18, "Reading exposure, color, noise…");
-        } else if (event === "complete") {
-          const result = Array.isArray(data?.results) ? data.results[0] : null;
-          state.updateImage(path, {
-            state: "ready",
-            issues: result?.issues || [],
-            features: result?.features || null,
-          });
-          if (layout?.kind === "single") {
-            layout.ribbon?.setIssues?.(result?.issues || []);
-            layout.hist?.setMetrics?.(result?.features || {});
-          }
-          handle.cancel?.();
-          finish();
-        } else if (event === "error") {
-          state.updateImage(path, { state: "error" });
-          if (layout?.kind === "single") layout.ribbon?.setError?.("Analysis failed.");
-          finish();
-        }
-      },
-      onError: (err) => {
-        console.error("classify SSE", err);
-        state.updateImage(path, { state: "error" });
-        if (layout?.kind === "single") layout.ribbon?.setError?.("Analysis failed.");
-        finish();
-      },
-      onComplete: () => {
-        const img = state.get("images").find((r) => r.path === path);
-        if (img?.state === "analyzing") {
-          state.updateImage(path, { state: "error" });
-          if (layout?.kind === "single") layout.ribbon?.setError?.("Analysis failed.");
-          toast.error("Analysis failed — try again.");
-        }
-        finish();
-      },
-    }, { enableSkin: true }));
-  });
+// Aggregate progress → the batch banner ("X / N analysed"). Hidden once idle.
+function updateBatchBanner({ total, done, failed } = {}) {
+  if (layout?.kind !== "batch" || !layout.banner) return;
+  const banner = layout.banner;
+  const processed = (done || 0) + (failed || 0);
+  const remaining = (total || 0) - processed;
+  banner.hidden = remaining <= 0;
+  const label = banner.querySelector(".batch-banner__label") || banner.querySelector("span");
+  if (label) label.innerHTML = `<i class="bi bi-stars"></i> Analyzing images`;
+  const countEl = banner.querySelector("[data-count]");
+  if (countEl) countEl.textContent = total ? `${processed} / ${total} analyzed` : "";
+  const barEl = banner.querySelector("[data-bar]");
+  if (barEl) barEl.style.width = total ? `${Math.round((processed / total) * 100)}%` : "0%";
 }
 
 function reportProgress(path, kind, progress, text) {
@@ -573,6 +566,7 @@ function humanState(s) {
   switch (s) {
     case "uploading": return "Uploading…";
     case "decoding":  return "Decoding RAW…";
+    case "queued":    return "Queued…";
     case "analyzing": return "Analyzing…";
     case "ready":     return "Ready.";
     case "error":     return "Error.";

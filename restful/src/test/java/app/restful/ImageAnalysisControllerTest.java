@@ -39,6 +39,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import app.restful.dto.ClassifyResponse;
 import app.restful.dto.GroupRequest;
 import app.restful.dto.GroupResult;
+import app.restful.dto.HistogramData;
+import app.restful.dto.HistogramRequest;
 import app.restful.dto.ImageClassifyRequest;
 import app.restful.dto.ImageFeatures;
 import app.restful.dto.ImageIssue;
@@ -307,10 +309,66 @@ public class ImageAnalysisControllerTest {
         classifyHeaders.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<ImageClassifyRequest> classifyEntity = new HttpEntity<>(classifyRequest, classifyHeaders);
 
-        ResponseEntity<ClassifyResponse> classifyResponse = 
+        ResponseEntity<ClassifyResponse> classifyResponse =
             restTemplate.postForEntity("/images/classify", classifyEntity, ClassifyResponse.class);
 
         assertEquals(HttpStatus.OK, classifyResponse.getStatusCode());
         assertTrue(classifyResponse.getBody().success());
+    }
+
+    @Test
+    @DisplayName("Histogram - returns per-channel counts that sum to the pixel total")
+    void testHistogram() throws Exception {
+        // A 40x25 flat image → 1000 pixels; counts per channel must sum to 1000.
+        byte[] img = createTestImage(40, 25, 128);
+        ByteArrayResource resource = new ByteArrayResource(img) {
+            @Override public String getFilename() { return "hist_test.png"; }
+        };
+        MultiValueMap<String, Object> uploadBody = new LinkedMultiValueMap<>();
+        uploadBody.add("files", resource);
+        HttpHeaders uploadHeaders = new HttpHeaders();
+        uploadHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+        ResponseEntity<UploadResponse> uploadResponse = restTemplate.postForEntity(
+            "/images/upload", new HttpEntity<>(uploadBody, uploadHeaders), UploadResponse.class);
+        String path = uploadResponse.getBody().paths().get(0);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<HistogramRequest> entity = new HttpEntity<>(new HistogramRequest(path, 256, true), headers);
+
+        ResponseEntity<HistogramData> response =
+            restTemplate.postForEntity("/images/histogram", entity, HistogramData.class);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        HistogramData h = response.getBody();
+        assertNotNull(h);
+        assertEquals(256, h.bins());
+        assertEquals(256, h.luma().length);
+
+        int sum = 0;
+        for (int c : h.luma()) sum += c;
+        assertEquals(1000, sum, "luma counts must cover every pixel");
+
+        // Core channels always present; advanced=true adds hue + dark channel.
+        assertNotNull(h.red());
+        assertNotNull(h.green());
+        assertNotNull(h.blue());
+        assertNotNull(h.saturation());
+        assertNotNull(h.hue());
+        assertNotNull(h.darkChannel());
+    }
+
+    @Test
+    @DisplayName("Histogram - missing path returns 400")
+    void testHistogramMissingPath() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<HistogramRequest> entity =
+            new HttpEntity<>(new HistogramRequest("/no/such/file.png", 256, false), headers);
+
+        ResponseEntity<String> response =
+            restTemplate.postForEntity("/images/histogram", entity, String.class);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
 }
