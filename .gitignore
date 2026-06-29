@@ -14,3 +14,9 @@ coverage/
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
+
+# Local RAW troubleshooting samples
+restful/raw-samples/*
+!restful/raw-samples/.gitkeep
+!restful/raw-samples/README.md
+exif-dump.txt

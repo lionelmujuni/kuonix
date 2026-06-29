@@ -42,6 +42,15 @@ tasks.named('test') {
 	testLogging {
 		events "passed", "failed", "skipped"
 	}
+	// Forward the ExifDumpTest inputs to the forked test JVM, and surface its
+	// stdout, only when supplied (-DexifDumpPath=... / -DexifDir=...). Normal
+	// runs are unaffected — ExifDumpTest skips itself when no input is set, and
+	// it also writes the dump to restful/exif-dump.txt regardless.
+	systemProperty 'exifDumpPath', System.getProperty('exifDumpPath', '')
+	systemProperty 'exifDir', System.getProperty('exifDir', '')
+	if (System.getProperty('exifDumpPath') || System.getProperty('exifDir')) {
+		testLogging.showStandardStreams = true
+	}
 }
 
 sourceSets {

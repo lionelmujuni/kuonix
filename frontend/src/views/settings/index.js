@@ -114,14 +114,9 @@ function template() {
             <h3 class="card__title">Ollama Cloud</h3>
             <p class="muted card__hint">
               Drop a key from <a href="https://ollama.com/cloud" target="_blank" rel="noopener">ollama.com</a>
-              to enable conversational editing. Saves locally to <code>~/.kuonix/ollama-settings.json</code>.
+              to turn on AI across Kuonix; clear it to turn AI off. Saves locally to <code>~/.kuonix/ollama-settings.json</code>.
             </p>
           </div>
-          <label class="switch">
-            <input type="checkbox" data-field="enabled">
-            <span class="switch__slider"></span>
-            <span class="switch__label" data-enabled-label>Disabled</span>
-          </label>
         </div>
 
         <div class="ai-fields" data-ai-fields>
@@ -195,11 +190,10 @@ function template() {
     <section class="settings__section reveal" data-section="features" hidden>
       <div class="card">
         <h3 class="card__title">Feature modules</h3>
-        <p class="muted card__hint">Toggle which parts of Kuonix are active. Disabled modules hide their UI entirely. Changes take effect immediately.</p>
+        <p class="muted card__hint">Toggle which parts of Kuonix are active. Disabled modules hide their UI entirely. Changes take effect immediately. The AI assistant turns on automatically when you add an Ollama key in the AI tab.</p>
         <div class="module-list" data-module-list>
           ${[
             { key: "editing",        icon: "bi-sliders2-vertical", label: "Editing",         desc: "Sliders panel, color correction, commit & export" },
-            { key: "aiAssistant",    icon: "bi-stars",             label: "AI Assistant",    desc: "Conversational agent, analysis, correction suggestions" },
             { key: "batchProcessing",icon: "bi-images",            label: "Batch processing",desc: "Contact sheet, group filter, multi-image workflows" },
             { key: "rawDecode",      icon: "bi-camera",            label: "RAW decode",      desc: "CR2/NEF/ARW and other RAW format processing" },
             { key: "cameraFeedback", icon: "bi-camera2",           label: "Camera feedback", desc: "EXIF-based tips on how camera settings affect results" },
@@ -544,16 +538,6 @@ function bindAiSection(view) {
   const tempVal = view.querySelector("[data-temp-val]");
   temp.addEventListener("input", () => { tempVal.textContent = Number(temp.value).toFixed(2); });
 
-  // Enable toggle drives field disabled state.
-  const enabled = view.querySelector("[data-field='enabled']");
-  const fields = view.querySelector("[data-ai-fields]");
-  const enabledLabel = view.querySelector("[data-enabled-label]");
-  enabled.addEventListener("change", () => {
-    fields.dataset.disabled = String(!enabled.checked);
-    enabledLabel.textContent = enabled.checked ? "Enabled" : "Disabled";
-    markDirty(view);
-  });
-
   setupModelSelect(view);
 
   // Buttons.
@@ -594,9 +578,9 @@ async function loadAiSettings(view) {
     dirty = false;
     view.querySelector("[data-action='save']").disabled = true;
     view.querySelector("[data-restart]").hidden = true;
-    status.textContent = currentSettings.enabled
-      ? "Connected — agent is live."
-      : "AI is disabled. Toggle on to enable conversational edits.";
+    status.textContent = currentSettings.apiKey
+      ? "Connected — AI is live across Kuonix."
+      : "Add an Ollama key to enable AI features.";
   } catch (err) {
     console.error(err);
     status.textContent = "Could not reach backend at :8081.";
@@ -605,10 +589,6 @@ async function loadAiSettings(view) {
 
 function populateFields(view) {
   const s = currentSettings;
-  view.querySelector("[data-field='enabled']").checked = !!s.enabled;
-  view.querySelector("[data-enabled-label]").textContent = s.enabled ? "Enabled" : "Disabled";
-  view.querySelector("[data-ai-fields]").dataset.disabled = String(!s.enabled);
-
   view.querySelector("[data-field='apiKey']").value = s.apiKey || "";
   view.querySelector("[data-field='baseUrl']").value = s.baseUrl || "https://api.ollama.com";
   view.querySelector("[data-field='temperature']").value = s.temperature ?? 0.3;
@@ -798,15 +778,15 @@ function markDirty(view) {
 }
 
 async function saveAi(view) {
-  const enabled = view.querySelector("[data-field='enabled']").checked;
   const apiKey = view.querySelector("[data-field='apiKey']").value.trim();
   const modelName = view.querySelector("[data-field='modelName']").value.trim();
   const baseUrl = view.querySelector("[data-field='baseUrl']").value.trim();
   const temperature = parseFloat(view.querySelector("[data-field='temperature']").value);
   const maxTokens = parseInt(view.querySelector("[data-field='maxTokens']").value, 10);
 
-  if (enabled) {
-    if (!apiKey) return toast.error("API key is required when AI is enabled.");
+  // AI is enabled by configuration: a key turns it on, a blank key turns it off.
+  const enabled = !!apiKey;
+  if (apiKey) {
     if (!modelName) return toast.error("Pick a model.");
     if (!baseUrl) return toast.error("Base URL is required.");
     if (isNaN(temperature) || temperature < 0 || temperature > 2) return toast.error("Temperature must be 0–2.");

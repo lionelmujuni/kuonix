@@ -210,6 +210,22 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
   shell.openPath(folderPath);
 });
 
+// IPC handler to open an external http/https URL in the default browser.
+// Only http/https are allowed so renderer content can't launch arbitrary
+// protocols/executables via shell.openExternal.
+ipcMain.handle('open-external', async (event, externalUrl) => {
+  try {
+    const parsed = new URL(externalUrl);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      await shell.openExternal(externalUrl);
+      return { success: true };
+    }
+    return { success: false, error: 'Only http/https URLs are allowed' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // IPC handler for reference image selection (Color Lab)
 ipcMain.handle('select-reference-image', async () => {
   const { dialog } = require('electron');

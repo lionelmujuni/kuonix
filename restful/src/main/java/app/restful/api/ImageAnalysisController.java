@@ -33,6 +33,7 @@ import app.restful.dto.ImageUrlRequest;
 import app.restful.dto.ImageUrlResponse;
 import app.restful.dto.UploadResponse;
 import app.restful.services.CameraFeedbackService;
+import app.restful.services.CameraTipRenderer;
 import app.restful.services.ExifCache;
 import app.restful.services.ExifExtractorService;
 import app.restful.services.GroupingService;
@@ -52,13 +53,15 @@ public class ImageAnalysisController {
     private final ExifExtractorService exifExtractor;
     private final ExifCache exifCache;
     private final CameraFeedbackService cameraFeedback;
+    private final CameraTipRenderer tipRenderer;
     private final HistogramService histogramService;
     private final java.util.concurrent.Executor analysisExecutor;
 
     public ImageAnalysisController(StorageService storage, ImageAnalysisService analysis,
             ImageClassifierService classifier, GroupingService grouping,
             ExifExtractorService exifExtractor, ExifCache exifCache,
-            CameraFeedbackService cameraFeedback, HistogramService histogramService,
+            CameraFeedbackService cameraFeedback, CameraTipRenderer tipRenderer,
+            HistogramService histogramService,
             @org.springframework.beans.factory.annotation.Qualifier("analysisExecutor") java.util.concurrent.Executor analysisExecutor) {
         this.storage = storage;
         this.analysis = analysis;
@@ -67,6 +70,7 @@ public class ImageAnalysisController {
         this.exifExtractor = exifExtractor;
         this.exifCache = exifCache;
         this.cameraFeedback = cameraFeedback;
+        this.tipRenderer = tipRenderer;
         this.histogramService = histogramService;
         this.analysisExecutor = analysisExecutor;
     }
@@ -233,7 +237,9 @@ public class ImageAnalysisController {
                 var feats  = analysis.compute(path, req.enableSkin());
                 var labels = classifier.classify(feats);
                 var exif   = exifExtractor.extract(path);
-                result.put(p, cameraFeedback.evaluate(labels, exif));
+                // AI-tone the deterministic tips (cached by issue + EXIF bucket);
+                // no-op pass-through when Ollama is not configured.
+                result.put(p, tipRenderer.enrich(cameraFeedback.evaluate(labels, exif), exif));
             }
             return ResponseEntity.ok(result);
         } catch (Exception e) {

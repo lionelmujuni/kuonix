@@ -8,8 +8,10 @@ import { getModules } from "./api/endpoints/settings.js";
 import * as state from "./state.js";
 
 const DEFAULT_MODULES = {
-  editing: true, aiAssistant: true, batchProcessing: true,
-  rawDecode: true, cameraFeedback: false, styleProfiles: false,
+  // aiAssistant is derived server-side from whether Ollama is configured.
+  // Default it off so AI UI stays hidden until the backend confirms a key.
+  editing: true, aiAssistant: false, batchProcessing: true,
+  rawDecode: true, cameraFeedback: true, styleProfiles: false,
 };
 
 // ---- Theme & accent application ----------------------------------------

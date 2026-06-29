@@ -13,8 +13,10 @@ import org.junit.jupiter.api.TestInstance;
 import app.restful.dto.CameraFeedback;
 import app.restful.dto.ExifData;
 import app.restful.dto.ImageIssue;
+import app.restful.dto.ResourceLink;
 import app.restful.services.CameraFeedbackService;
 import app.restful.services.CameraKnowledgeBase;
+import app.restful.services.ResourceLinkService;
 
 /**
  * Unit tests for the knowledge-base-driven CameraFeedbackService. Loads the
@@ -29,7 +31,7 @@ public class CameraFeedbackServiceTest {
     void setup() {
         CameraKnowledgeBase kb = new CameraKnowledgeBase();
         kb.load();
-        service = new CameraFeedbackService(kb);
+        service = new CameraFeedbackService(kb, new ResourceLinkService());
     }
 
     // ISO=value, no other EXIF.
@@ -146,5 +148,19 @@ public class CameraFeedbackServiceTest {
     void nullOrEmptyIssuesReturnEmpty() {
         assertTrue(service.evaluate(null, exifIso(100)).isEmpty());
         assertTrue(service.evaluate(List.of(), exifIso(100)).isEmpty());
+    }
+
+    @Test
+    void feedbackCarriesCuratedAndCameraTailoredSearchLinks() {
+        ExifData exif = new ExifData(6400, null, null, null, "Canon EOS R5", null, null, null);
+        CameraFeedback fb = only(service.evaluate(List.of(ImageIssue.Needs_Noise_Reduction), exif));
+        List<ResourceLink> res = fb.resources();
+
+        assertTrue(res.stream().anyMatch(r -> "article".equals(r.type())), "expected a curated article link");
+
+        ResourceLink google = res.stream().filter(r -> r.url().contains("google.com")).findFirst().orElseThrow();
+        assertEquals("search", google.type());
+        assertTrue(google.url().contains("Canon"), "search query should seed the camera model: " + google.url());
+        assertTrue(res.stream().anyMatch(r -> r.url().contains("youtube.com")), "expected a YouTube search link");
     }
 }

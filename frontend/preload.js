@@ -35,3 +35,9 @@ contextBridge.exposeInMainWorld('dialog', {
   openFolder: (path) => ipcRenderer.invoke('open-folder', path),
   selectReferenceImage: () => ipcRenderer.invoke('select-reference-image')
 });
+
+// Open an http/https URL in the user's default browser, kept separate from the
+// app so a broken or closed page never affects Kuonix.
+contextBridge.exposeInMainWorld('shellOpen', {
+  external: (url) => ipcRenderer.invoke('open-external', url)
+});

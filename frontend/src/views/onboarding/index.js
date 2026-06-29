@@ -13,9 +13,10 @@ const INTENT_MODULES = {
   both:         { editing: true, aiAssistant: true, batchProcessing: true, rawDecode: true, cameraFeedback: true,  styleProfiles: true },
 };
 
+// aiAssistant is intentionally absent — it is not a manual toggle; it turns on
+// automatically when an Ollama key is configured in Settings → AI.
 const MODULE_LABELS = {
   editing:         { label: "Editing",          icon: "bi-sliders2-vertical", desc: "Sliders, color correction, commit & export" },
-  aiAssistant:     { label: "AI Assistant",      icon: "bi-stars",             desc: "Conversational agent and correction suggestions" },
   batchProcessing: { label: "Batch processing",  icon: "bi-images",            desc: "Contact sheet and multi-image workflows" },
   rawDecode:       { label: "RAW decode",         icon: "bi-camera",            desc: "CR2, NEF, ARW and other RAW formats" },
   cameraFeedback:  { label: "Camera feedback",   icon: "bi-camera2",           desc: "EXIF-based in-camera setting tips" },

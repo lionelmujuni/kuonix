@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.Yaml;
 
 import app.restful.dto.ImageIssue;
+import app.restful.dto.ResourceLink;
 import jakarta.annotation.PostConstruct;
 
 /**
@@ -39,7 +40,8 @@ public class CameraKnowledgeBase {
     /** Knowledge for one {@link ImageIssue}. */
     public record IssueKnowledge(String issue, String cause, String physics,
                                  List<String> levers, String severity,
-                                 String baseTip, List<ConditionTip> conditions) {}
+                                 String baseTip, List<ConditionTip> conditions,
+                                 List<ResourceLink> resources, String searchTerms) {}
 
     private Map<String, IssueKnowledge> knowledge = Collections.emptyMap();
 
@@ -95,7 +97,26 @@ public class CameraKnowledgeBase {
                 asStringList(v.get("levers")),
                 str(v.getOrDefault("severity", "medium")),
                 collapse(str(v.get("base_tip"))),
-                List.copyOf(conditions));
+                List.copyOf(conditions),
+                parseResources(v.get("resources")),
+                collapse(str(v.get("search_terms"))));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<ResourceLink> parseResources(Object raw) {
+        List<ResourceLink> out = new ArrayList<>();
+        if (raw instanceof List<?> l) {
+            for (Object o : l) {
+                if (o instanceof Map<?, ?> rm) {
+                    Map<String, Object> r = (Map<String, Object>) rm;
+                    out.add(new ResourceLink(
+                            str(r.get("label")),
+                            str(r.get("url")),
+                            str(r.getOrDefault("type", "article"))));
+                }
+            }
+        }
+        return List.copyOf(out);
     }
 
     /** Knowledge for an issue, or empty when the issue has no camera tip. */

@@ -12,6 +12,17 @@ public record AppModules(
     boolean styleProfiles
 ) {
     public static AppModules defaults() {
-        return new AppModules(true, true, true, true, false, false);
+        // cameraFeedback on by default so photographers see in-camera tips;
+        // aiAssistant is derived from Ollama config (see withAiAssistant).
+        return new AppModules(true, true, true, true, true, false);
+    }
+
+    /**
+     * Return a copy with {@code aiAssistant} overridden. The AI module is not a
+     * stored user toggle — it is derived from whether Ollama is configured, so
+     * the controller overrides it on read.
+     */
+    public AppModules withAiAssistant(boolean ai) {
+        return new AppModules(editing, ai, batchProcessing, rawDecode, cameraFeedback, styleProfiles);
     }
 }

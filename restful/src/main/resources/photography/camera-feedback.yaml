@@ -44,6 +44,11 @@ issues:
       then stretches those same noisy shadows further during the raw push.
     levers: [lower ISO, wider aperture, longer exposure, tripod, expose to the right]
     severity: medium
+    search_terms: reduce high ISO noise in low light photography
+    resources:
+      - label: Understanding image noise
+        url: https://en.wikipedia.org/wiki/Image_noise
+        type: article
     base_tip: >-
       Reduce ISO to minimise sensor noise. Use a tripod to compensate with a
       slower shutter.
@@ -69,6 +74,11 @@ issues:
       ratio in the shadows is poor.
     levers: [open aperture, slower shutter, positive exposure compensation, add light]
     severity: low
+    search_terms: exposure triangle low light correct exposure
+    resources:
+      - label: The exposure triangle explained
+        url: https://en.wikipedia.org/wiki/Exposure_(photography)
+        type: article
     base_tip: >-
       Apply +1 EV exposure compensation in-camera, or use a wider aperture /
       slower shutter.
@@ -88,6 +98,11 @@ issues:
       aperture, shutter or ISO brings the signal back into the sensor's range.
     levers: [narrower aperture, faster shutter, negative exposure compensation]
     severity: low
+    search_terms: avoid overexposure exposure compensation
+    resources:
+      - label: Exposure compensation explained
+        url: https://en.wikipedia.org/wiki/Exposure_compensation
+        type: article
     base_tip: >-
       Apply −1 EV exposure compensation, use a narrower aperture (higher
       f-number), or increase shutter speed.
@@ -101,6 +116,11 @@ issues:
       recovered in post.
     levers: [highlight warnings, negative exposure compensation, expose for highlights, graduated ND]
     severity: high
+    search_terms: prevent blown highlights expose to the right
+    resources:
+      - label: Highlight clipping explained
+        url: https://en.wikipedia.org/wiki/Clipping_(photography)
+        type: article
     base_tip: >-
       Enable highlight warnings on your camera. Dial down −0.7 EV before
       shooting contrasty scenes.
@@ -113,6 +133,11 @@ issues:
       shadow end fell below the sensor's noise floor and clipped to black.
     levers: [fill flash, reflector, positive exposure compensation, bracket and blend]
     severity: medium
+    search_terms: recover shadow detail fill flash dynamic range
+    resources:
+      - label: Fill flash technique
+        url: https://en.wikipedia.org/wiki/Fill_flash
+        type: article
     base_tip: >-
       Shadows are clipping. Use fill flash or reflector, or expose +0.5 EV and
       recover highlights in post.
@@ -126,6 +151,11 @@ issues:
       compounded by the depth-compression of long focal lengths.
     levers: [polarising filter, UV filter, shoot with sun behind you, lower-humidity conditions]
     severity: low
+    search_terms: reduce atmospheric haze polarising filter landscape
+    resources:
+      - label: Polarising filters in photography
+        url: https://en.wikipedia.org/wiki/Polarizing_filter_(photography)
+        type: article
     base_tip: >-
       Use a UV or polarising filter to cut haze in-camera. Avoid backlit shots
       in humid conditions.
@@ -145,6 +175,11 @@ issues:
       shifted along that axis.
     levers: [custom white balance, Kelvin mode, grey-card calibration, match WB to light source]
     severity: low
+    search_terms: set custom white balance grey card colour cast
+    resources:
+      - label: Colour balance and white balance
+        url: https://en.wikipedia.org/wiki/Color_balance
+        type: article
     base_tip: >-
       Set a custom white balance matched to the light source to avoid this cast
       in-camera.
@@ -174,6 +209,11 @@ issues:
       once, so skin — which the eye judges harshly — drifts off-hue.
     levers: [match WB to dominant light, custom WB preset, gel mixed sources, avoid fluorescent]
     severity: medium
+    search_terms: correct skin tones white balance portrait lighting
+    resources:
+      - label: White balance for skin tones
+        url: https://en.wikipedia.org/wiki/Color_balance
+        type: article
     base_tip: >-
       Fluorescent or mixed artificial light is skewing skin tones. Set WB to the
       dominant light source or use a custom preset.

@@ -3,6 +3,7 @@ package app.restful.services;
 import app.restful.dto.CameraFeedback;
 import app.restful.dto.ExifData;
 import app.restful.dto.ImageIssue;
+import app.restful.dto.ResourceLink;
 import app.restful.services.CameraKnowledgeBase.ConditionTip;
 import app.restful.services.CameraKnowledgeBase.IssueKnowledge;
 import org.springframework.stereotype.Service;
@@ -26,9 +27,11 @@ public class CameraFeedbackService {
     private static final Pattern DECIMAL  = Pattern.compile("([\\d.]+)\\s*sec");
 
     private final CameraKnowledgeBase knowledgeBase;
+    private final ResourceLinkService resourceLinks;
 
-    public CameraFeedbackService(CameraKnowledgeBase knowledgeBase) {
+    public CameraFeedbackService(CameraKnowledgeBase knowledgeBase, ResourceLinkService resourceLinks) {
         this.knowledgeBase = knowledgeBase;
+        this.resourceLinks = resourceLinks;
     }
 
     public List<CameraFeedback> evaluate(List<ImageIssue> issues, ExifData exif) {
@@ -53,7 +56,8 @@ public class CameraFeedbackService {
                     break;
                 }
             }
-            feedback.add(new CameraFeedback(issue.name(), interpolate(tip, exif), severity));
+            List<ResourceLink> resources = resourceLinks.linksFor(k, exif);
+            feedback.add(new CameraFeedback(issue.name(), interpolate(tip, exif), severity, resources));
         }
 
         // Cross-cutting motion-blur check — computed from the reciprocal rule
@@ -64,7 +68,8 @@ public class CameraFeedbackService {
                 feedback.add(new CameraFeedback("MOTION_BLUR",
                     String.format("Shutter %.4f s is slower than the 1/%.0f s minimum for handheld at %.0f mm. Use a faster shutter, IS, or a tripod.",
                         shutterSec, focalLength, focalLength),
-                    "high"));
+                    "high",
+                    resourceLinks.searchLinks("sharp handheld photos shutter speed reciprocal rule", exif)));
             }
         }
         return feedback;

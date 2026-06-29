@@ -13,8 +13,11 @@ import app.restful.agent.KuonixAgentTools;
 import app.restful.agent.KuonixAiService;
 import app.restful.dto.OllamaSettings;
 import app.restful.services.SettingsService;
+import app.restful.services.TipModel;
 import dev.langchain4j.memory.chat.ChatMemoryProvider;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.ollama.OllamaChatModel;
 import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.service.AiServices;
 
@@ -43,13 +46,8 @@ public class DynamicOllamaConfig {
     public StreamingChatModel streamingChatModel(SettingsService settingsService) {
         OllamaSettings settings = settingsService.getOllamaSettings();
 
-        if (!settings.enabled()) {
-            log.info("Ollama AI is disabled in user settings. AI features unavailable.");
-            return null;
-        }
-
-        if (settings.apiKey() == null || settings.apiKey().isBlank()) {
-            log.warn("Ollama API key not configured. AI features unavailable.");
+        if (!settings.isConfigured()) {
+            log.info("Ollama not configured (no valid API key). AI features unavailable.");
             return null;
         }
 
@@ -74,6 +72,40 @@ public class DynamicOllamaConfig {
                 .logRequests(true)
                 .logResponses(true)
                 .build();
+    }
+
+    /**
+     * Non-streaming chat model wrapped as a {@link TipModel} for one-shot tip
+     * rendering (camera-feedback toning). Built from the same user settings and
+     * gated identically to the streaming model — returns null when AI is
+     * disabled or unconfigured, so CameraTipRenderer falls back to deterministic
+     * knowledge-base tips.
+     */
+    @Bean
+    public TipModel tipModel(SettingsService settingsService) {
+        OllamaSettings settings = settingsService.getOllamaSettings();
+
+        if (!settings.isConfigured()) {
+            log.info("Ollama not configured — camera tips will use deterministic knowledge-base text.");
+            return null;
+        }
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Authorization", "Bearer " + settings.apiKey());
+
+        int effectiveMaxTokens = (settings.maxTokens() == null || settings.maxTokens() < 8192)
+                ? 8192 : settings.maxTokens();
+
+        ChatModel model = OllamaChatModel.builder()
+                .baseUrl(settings.baseUrl())
+                .modelName(settings.modelName())
+                .temperature(settings.temperature())
+                .numPredict(effectiveMaxTokens)
+                .timeout(Duration.ofSeconds(60))
+                .customHeaders(headers)
+                .build();
+
+        return model::chat;
     }
 
     @Bean

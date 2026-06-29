@@ -97,7 +97,10 @@ public class SettingsController {
     @GetMapping("/modules")
     public ModulesResponse getModules() {
         boolean firstRun = settingsService.isFirstRun();
-        AppModules m = settingsService.getModules();
+        // aiAssistant is not a manual toggle — derive it from whether Ollama is
+        // configured so AI UI appears exactly when AI workflows are available.
+        AppModules m = settingsService.getModules()
+                .withAiAssistant(settingsService.getOllamaSettings().isConfigured());
         return new ModulesResponse(m, firstRun);
     }
 
