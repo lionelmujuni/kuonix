@@ -165,6 +165,60 @@ public class RawImageController {
     }
     
     /**
+     * Lightweight polling alternative to the SSE decode stream.
+     *
+     * The Electron renderer is limited to 6 concurrent HTTP/1.1 connections
+     * per origin, so one long-lived EventSource per image starves every other
+     * request (classify, uploads) during a batch. A single multiplexed poll
+     * reports all tasks in one short-lived round trip, and queue waiting time
+     * can never expire a connection.
+     *
+     * Terminal states (complete/error) are reported once, then the task is
+     * dropped; unknown task ids are reported as "missing" (also terminal).
+     */
+    @GetMapping("/decode-status")
+    public ResponseEntity<List<DecodeProgressEvent>> decodeStatus(@RequestParam List<String> taskIds) {
+        if (taskIds.size() > 100) {
+            throw new IllegalArgumentException("Maximum 100 tasks per poll");
+        }
+
+        List<DecodeProgressEvent> events = new ArrayList<>();
+        for (String taskId : taskIds) {
+            RawProcessingService.DecodeTask task = rawService.getTask(taskId);
+
+            if (task == null) {
+                events.add(DecodeProgressEvent.missing(taskId));
+                continue;
+            }
+
+            String status = task.getStatus();
+            if ("complete".equals(status)) {
+                Path outputPath = task.getOutputPath();
+                int width = 0, height = 0;
+                if (outputPath != null) {
+                    Mat mat = opencv_imgcodecs.imread(outputPath.toString());
+                    if (mat != null && !mat.empty()) {
+                        width = mat.cols();
+                        height = mat.rows();
+                        mat.release();
+                    }
+                }
+                events.add(DecodeProgressEvent.complete(
+                    taskId, outputPath != null ? outputPath.toString() : null, width, height));
+                rawService.removeTask(taskId);
+            } else if ("error".equals(status)) {
+                events.add(DecodeProgressEvent.error(taskId, task.getError()));
+                rawService.removeTask(taskId);
+            } else {
+                events.add(DecodeProgressEvent.progress(
+                    taskId, task.getProgress(), task.getRawPath().getFileName().toString()));
+            }
+        }
+
+        return ResponseEntity.ok(events);
+    }
+
+    /**
      * Server-Sent Events endpoint for batched decode progress.
      * Monitors multiple decode tasks simultaneously and streams multiplexed progress updates.
      * 

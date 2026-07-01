@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.Semaphore;
 
 /**
  * Computes image features for classification.
@@ -23,13 +24,35 @@ public class ImageAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(ImageAnalysisService.class);
 
+    // The features are global statistics — percentiles, means, masked
+    // histograms — so computing them on a bounded-size copy is equivalent.
+    // Full 24MP decodes otherwise allocate ~10 frame-sized float Mats each.
+    private static final int ANALYSIS_MAX_DIM = 2560;
+
+    // Bounds concurrent analyses regardless of entry point. The /classify
+    // endpoint runs on unbounded HTTP request threads, so the executor pool
+    // alone can't enforce this. Sized to match analysisExecutor's max.
+    private static final int MAX_CONCURRENT_ANALYSES =
+        Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors()));
+
+    private final Semaphore analysisSlots = new Semaphore(MAX_CONCURRENT_ANALYSES, true);
+
     private final RawProcessingService rawService;
-    
+
     public ImageAnalysisService(RawProcessingService rawService) {
         this.rawService = rawService;
     }
 
     public ImageFeatures compute(Path path, boolean enableSkin) {
+        analysisSlots.acquireUninterruptibly();
+        try {
+            return computeBounded(path, enableSkin);
+        } finally {
+            analysisSlots.release();
+        }
+    }
+
+    private ImageFeatures computeBounded(Path path, boolean enableSkin) {
         if (!Files.exists(path)) {
             throw new IllegalArgumentException("File not found: " + path);
         }
@@ -66,8 +89,23 @@ public class ImageAnalysisService {
             throw new IllegalArgumentException("Unreadable image: " + imagePath);
         }
 
+        // Reported dimensions stay those of the decoded file.
         int h = bgr.rows();
         int w = bgr.cols();
+
+        // Analyse at a bounded resolution. Half-size previews already land
+        // under this cap, so it also makes preview- and full-decode analyses
+        // more consistent with each other.
+        int maxSide = Math.max(w, h);
+        if (maxSide > ANALYSIS_MAX_DIM) {
+            double scale = (double) ANALYSIS_MAX_DIM / maxSide;
+            Mat resized = new Mat();
+            opencv_imgproc.resize(bgr, resized,
+                    new Size((int) Math.round(w * scale), (int) Math.round(h * scale)),
+                    0, 0, opencv_imgproc.INTER_AREA);
+            bgr.release();
+            bgr = resized;
+        }
 
         // Luminance approx on sRGB: Rec.709 weights on gamma-decoded approximation (fast).
         Mat bgrF = new Mat();

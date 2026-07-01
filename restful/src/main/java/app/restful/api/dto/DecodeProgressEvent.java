@@ -35,4 +35,12 @@ public record DecodeProgressEvent(
     public static DecodeProgressEvent error(String taskId, String errorMessage) {
         return new DecodeProgressEvent(taskId, "error", 0, null, null, null, null, errorMessage);
     }
+
+    /**
+     * Create event for a task id the server no longer tracks (old session,
+     * or already reported terminal). Terminal from the client's perspective.
+     */
+    public static DecodeProgressEvent missing(String taskId) {
+        return new DecodeProgressEvent(taskId, "missing", 0, null, null, null, null, null);
+    }
 }

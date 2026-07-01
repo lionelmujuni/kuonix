@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -56,7 +57,21 @@ public class RawProcessingService {
     private final RawImageCache imageCache;
     private final CameraMatrixCache matrixCache;
     private final String dcrawPath;
-    
+
+    // Hard caps on concurrent dcraw_emu child processes. Thread pools only
+    // bound Java threads — every decode spawns an external process that
+    // schedules its own CPU, and preview decodes run on unbounded HTTP request
+    // threads, so the caps must live here. Previews and full decodes get
+    // separate pools: previews block the upload response and must never queue
+    // behind multi-second full decodes.
+    private static final int MAX_CONCURRENT_PREVIEWS =
+        Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 2));
+    private static final int MAX_CONCURRENT_FULL_DECODES =
+        Math.max(1, Math.min(3, Runtime.getRuntime().availableProcessors() / 4));
+
+    private final Semaphore previewSlots = new Semaphore(MAX_CONCURRENT_PREVIEWS, true);
+    private final Semaphore fullDecodeSlots = new Semaphore(MAX_CONCURRENT_FULL_DECODES, true);
+
     // Track active decode tasks for SSE progress reporting
     private final Map<String, DecodeTask> activeTasks = new ConcurrentHashMap<>();
     
@@ -116,7 +131,8 @@ public class RawProcessingService {
         Path tempDir = Files.createTempDirectory("raw_decode_");
         Path tempRaw = tempDir.resolve(rawPath.getFileName());
         Files.copy(rawPath, tempRaw);
-        
+
+        previewSlots.acquire();
         try {
             List<String> command = new ArrayList<>();
             command.add(dcrawPath);
@@ -128,9 +144,11 @@ public class RawProcessingService {
             command.add("-o");
             command.add("1");           // sRGB output color space
             command.add(tempRaw.toString());
-            
+
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(tempDir.toFile()); // Run in temp directory
+            // LibRaw's OpenMP otherwise fans each process out across every core
+            pb.environment().put("OMP_NUM_THREADS", "1");
             
             log.debug("Executing: {}", String.join(" ", command));
             Process process = pb.start();
@@ -208,9 +226,11 @@ public class RawProcessingService {
             // Cleanup temp directory on error
             cleanupTempDirectory(tempDir);
             throw e;
+        } finally {
+            previewSlots.release();
         }
     }
-    
+
     /**
      * Decode RAW image to full quality (asynchronous).
      * Returns immediately with a task ID for progress tracking.
@@ -234,10 +254,8 @@ public class RawProcessingService {
         
         try {
             log.info("Starting full decode for: {} (task: {})", rawPath.getFileName(), taskId);
-            finalTask.setStatus("decoding");
-            finalTask.setProgress(5);
-            
-            // Check cache first
+
+            // Check cache first (no decode slot needed)
             Path cached = imageCache.get(rawPath, true);
             if (cached != null && Files.exists(cached)) {
                 log.info("Using cached full decode: {}", cached);
@@ -246,15 +264,18 @@ public class RawProcessingService {
                 finalTask.setOutputPath(cached);
                 return CompletableFuture.completedFuture(cached);
             }
-            
-            finalTask.setProgress(10);
-            
+
             // Decode with dcraw_emu: full-size, high quality
             // dcraw_emu writes output file in working directory, not to stdout
             Path tempDir = Files.createTempDirectory("raw_full_");
             Path tempRaw = tempDir.resolve(rawPath.getFileName());
             Files.copy(rawPath, tempRaw);
-            
+
+            // Stay "pending" while queued for a slot so progress reporting
+            // distinguishes waiting from actively decoding.
+            fullDecodeSlots.acquire();
+            finalTask.setStatus("decoding");
+            finalTask.setProgress(10);
             try {
                 List<String> command = new ArrayList<>();
                 command.add(dcrawPath);
@@ -265,9 +286,11 @@ public class RawProcessingService {
                 command.add("-o");
                 command.add("1");           // sRGB output color space
                 command.add(tempRaw.toString());
-                
+
                 ProcessBuilder pb = new ProcessBuilder(command);
                 pb.directory(tempDir.toFile()); // Run in temp directory
+                // LibRaw's OpenMP otherwise fans each process out across every core
+                pb.environment().put("OMP_NUM_THREADS", "2");
                 
                 log.debug("Executing: {}", String.join(" ", command));
                 finalTask.setProgress(20);
@@ -376,8 +399,10 @@ public class RawProcessingService {
                 // Cleanup temp directory on error
                 cleanupTempDirectory(tempDir);
                 throw e;
+            } finally {
+                fullDecodeSlots.release();
             }
-            
+
         } catch (Exception e) {
             log.error("Full decode failed for {}: {}", rawPath, e.getMessage(), e);
             finalTask.setStatus("error");
@@ -482,10 +507,12 @@ public class RawProcessingService {
     public static class DecodeTask {
         private final String taskId;
         private final Path rawPath;
-        private String status; // "pending", "decoding", "complete", "error"
-        private int progress; // 0-100
-        private Path outputPath;
-        private String error;
+        // Written by the decode + progress-monitor threads, read by the SSE
+        // polling thread — volatile for cross-thread visibility.
+        private volatile String status; // "pending", "decoding", "complete", "error"
+        private volatile int progress; // 0-100
+        private volatile Path outputPath;
+        private volatile String error;
         private final long startTime;
         
         public DecodeTask(String taskId, Path rawPath) {

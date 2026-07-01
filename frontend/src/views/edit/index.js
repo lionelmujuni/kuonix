@@ -23,7 +23,8 @@ import { createExifPanel } from "../../components/exif-panel/index.js";
 import { createStyleProfilePanel } from "../../components/style-profile-panel/index.js";
 import { createHistogramPanel } from "../../components/histogram-panel/index.js";
 
-import { uploadJpeg, uploadRaw, decodeStream, getUrls } from "../../api/endpoints/images.js";
+import { uploadJpeg, uploadRaw, getUrls } from "../../api/endpoints/images.js";
+import { watchDecode, cancelDecodeWatches } from "../../api/decode-poller.js";
 import { createAnalysisQueue } from "./analysis-queue.js";
 import { toast } from "../../components/toast/index.js";
 import { on, EVENTS } from "../../bus.js";
@@ -37,14 +38,8 @@ let imagesUnsub = null;
 let layout = null;          // { kind: "empty"|"single"|"batch", ...refs }
 let busUnsubs = [];
 
-let activeHandles = [];     // [{ cancel() }] in-flight per-file SSE handles
 let analysisQueue = null;   // concurrent decode→analyze scheduler (created on mount)
 
-function trackHandle(h) { if (h) activeHandles.push(h); return h; }
-function killHandles() {
-  for (const h of activeHandles) { try { h.cancel?.(); } catch {} }
-  activeHandles = [];
-}
 function unbindBus() {
   for (const off of busUnsubs) { try { off(); } catch {} }
   busUnsubs = [];
@@ -87,7 +82,7 @@ export function mount(outlet) {
 }
 
 export function unmount() {
-  killHandles();
+  cancelDecodeWatches();
   analysisQueue?.cancel();
   analysisQueue = null;
   unbindBus();
@@ -474,43 +469,38 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
 
   let activeFinalPath = info.previewPath;
 
-  await new Promise((resolve) => {
-    let resolved = false;
-    const finish = () => { if (!resolved) { resolved = true; resolve(); } };
-    const handle = trackHandle(decodeStream([info.taskId], {
-      onEvent: async ({ event, data }) => {
-        if (event === "progress") {
-          const pct = (data?.progress ?? 0) / 100;
-          reportProgress(activeFinalPath, "decoding", 0.15 + pct * 0.5, "Decoding RAW…");
-        } else if (event === "complete") {
-          const fullPath = data?.fullPath;
-          if (fullPath && fullPath !== activeFinalPath) {
-            // Rekey the slot to the full-resolution path in place.
-            state.renameImage(activeFinalPath, fullPath, { state: "decoding" });
-            activeFinalPath = fullPath;
-            setActivePath?.(fullPath);
-
-            const fullUrl = await fetchDataUrl(fullPath);
-            if (fullUrl) {
-              if (layout?.kind === "single" && layout._stageSrcSetter) layout._stageSrcSetter(fullUrl);
-              state.updateImage(fullPath, { url: fullUrl });
-              if (layout?.kind === "single") {
-                await layout.stage?.setImage?.(fullUrl);
-                layout.hist?.updateFromImageSrc?.(fullUrl);
-              }
-            }
-          }
-        } else if (event === "summary" || event === "done") {
-          handle.cancel?.();
-          finish();
-        } else if (event === "error") {
-          toast.warning("Decode error: " + (data?.error || "unknown"));
-        }
-      },
-      onError: (err) => { console.error("decode SSE", err); finish(); },
-      onComplete: finish,
-    }));
+  // Shared poller — one short-lived request per second covers every in-flight
+  // decode, so a long decode-queue wait can't expire a connection or starve
+  // the classify/upload fetches (Chromium allows only 6 sockets per origin).
+  const ev = await watchDecode(info.taskId, {
+    onProgress: (e) => {
+      const pct = (e?.progress ?? 0) / 100;
+      reportProgress(activeFinalPath, "decoding", 0.15 + pct * 0.5, "Decoding RAW…");
+    },
   });
+
+  if (ev?.status === "complete") {
+    const fullPath = ev.fullPath;
+    if (fullPath && fullPath !== activeFinalPath) {
+      // Rekey the slot to the full-resolution path in place.
+      state.renameImage(activeFinalPath, fullPath, { state: "decoding" });
+      activeFinalPath = fullPath;
+      setActivePath?.(fullPath);
+
+      const fullUrl = await fetchDataUrl(fullPath);
+      if (fullUrl) {
+        if (layout?.kind === "single" && layout._stageSrcSetter) layout._stageSrcSetter(fullUrl);
+        state.updateImage(fullPath, { url: fullUrl });
+        if (layout?.kind === "single") {
+          await layout.stage?.setImage?.(fullUrl);
+          layout.hist?.updateFromImageSrc?.(fullUrl);
+        }
+      }
+    }
+  } else if (ev?.status === "error") {
+    toast.warning("Decode error: " + (ev.error || "unknown"));
+  }
+  // "missing" / "cancelled" fall through: analyse whatever we have (preview).
 
   // Decoded (full-res, or preview if the full decode failed) → ready to analyse.
   analysisQueue?.enqueue(activeFinalPath);

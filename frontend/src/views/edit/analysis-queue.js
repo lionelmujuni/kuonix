@@ -23,9 +23,16 @@ const CONCURRENCY = Math.max(
 // timer only runs while the request is actually in flight.
 const ANALYSIS_TIMEOUT_MS = 60_000;
 
+// A timed-out image gets one more pass through the queue before it is marked
+// failed. Timeouts under batch load are almost always transient contention
+// (CPU saturated by decodes), not a bad image — retrying keeps outcomes
+// consistent across the batch.
+const MAX_ATTEMPTS = 2;
+
 export function createAnalysisQueue({ onItemStart, onResult, onProgress, enableSkin = true } = {}) {
   const pending = [];               // FIFO of paths awaiting a worker
   const inFlight = new Map();       // path → AbortController
+  const attempts = new Map();       // path → dispatch count (for timeout retries)
   let total = 0, done = 0, failed = 0, active = 0, workers = 0;
   let drain = null, resolveDrain = null;
 
@@ -82,13 +89,34 @@ export function createAnalysisQueue({ onItemStart, onResult, onProgress, enableS
       const res = await classify([path], { enableSkin, signal: controller.signal });
       const r = Array.isArray(res?.results) ? res.results[0] : null;
       if (!r) throw new Error(res?.message || "No analysis result");
+      attempts.delete(path);
       state.updateImage(path, { state: "ready", issues: r.issues || [], features: r.features || null });
       done += 1;
       onResult?.({ path, ok: true, result: r });
     } catch (err) {
+      // fetch rejects with the abort *reason* (a string), not an AbortError —
+      // read the signal to detect our own timeout reliably.
+      const timedOut = controller.signal.aborted && controller.signal.reason === "timeout";
+      const tries = attempts.get(path) || 1;
+      if (timedOut && tries < MAX_ATTEMPTS) {
+        // Back of the queue, not failure: the wait costs nothing (the timer
+        // only runs in flight) and the contention that starved this request
+        // has usually passed by its next turn.
+        attempts.set(path, tries + 1);
+        pending.push(path);
+        state.updateImage(path, { state: "queued" });
+        return;
+      }
+      attempts.delete(path);
       failed += 1;
       state.updateImage(path, { state: "error" });
-      onResult?.({ path, ok: false, error: err });
+      if (timedOut) {
+        const e = new Error("Analysis timed out");
+        e.name = "AbortError";
+        onResult?.({ path, ok: false, error: e });
+      } else {
+        onResult?.({ path, ok: false, error: err });
+      }
     } finally {
       clearTimeout(timer);
       inFlight.delete(path);
@@ -118,6 +146,7 @@ export function createAnalysisQueue({ onItemStart, onResult, onProgress, enableS
     pending.length = 0;
     for (const c of inFlight.values()) { try { c.abort("cancelled"); } catch {} }
     inFlight.clear();
+    attempts.clear();
   }
 
   function stats() {
