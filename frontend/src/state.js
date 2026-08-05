@@ -23,7 +23,6 @@ const defaults = {
 
   currentImagePath: null,
   currentImageUrl: null,
-  currentTaskId: null,
   currentIssues: [],
   currentFeatures: null,
   analysisState: "idle",    // idle | uploading | decoding | analyzing | ready | error
@@ -108,7 +107,6 @@ function syncActiveSnapshot() {
   const img = state.images[state.activeIndex] || null;
   state.currentImagePath  = img?.path  ?? null;
   state.currentImageUrl   = img?.url   ?? null;
-  state.currentTaskId     = img?.taskId ?? null;
   state.currentIssues     = img?.issues   ?? [];
   state.currentFeatures   = img?.features ?? null;
   state.analysisState     = img?.state ?? "idle";

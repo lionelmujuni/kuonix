@@ -1,9 +1,7 @@
 // SSE consumer.
 //
-// Two flavors:
-//   • postSse(path, body, handlers)  — POST + ReadableStream parse (used by /agent/chat,
-//     /images/classify-stream); returns a controller with .cancel().
-//   • eventSourceSse(path, handlers) — classic GET EventSource (used by /images/decode-stream).
+//   • postSse(path, body, handlers) — POST + ReadableStream parse (used by
+//     /agent/chat); returns a controller with .cancel().
 //
 // Handlers are { onEvent({event, data}), onToken(text), onError(err), onComplete() }.
 // `event` is the SSE `event:` name when present, "message" otherwise.
@@ -70,24 +68,4 @@ export function postSse(path, body, handlers = {}) {
   });
 
   return { cancel: () => ctrl.abort() };
-}
-
-export function eventSourceSse(path, handlers = {}) {
-  const es = new EventSource(`${BASE_URL}${path}`);
-  const wrap = (eventName) => (e) => {
-    if (e.data === "[DONE]") { handlers.onComplete?.(); es.close(); return; }
-    let parsed = e.data;
-    try { parsed = JSON.parse(e.data); } catch { /* keep */ }
-    handlers.onEvent?.({ event: eventName, data: parsed, raw: e.data });
-  };
-  es.onmessage = wrap("message");
-  // Backend names: progress, complete, error, summary.
-  for (const ev of ["progress", "complete", "error", "summary", "token", "correction", "commit", "done"]) {
-    es.addEventListener(ev, wrap(ev));
-  }
-  es.onerror = (e) => {
-    handlers.onError?.(e);
-    es.close();
-  };
-  return { cancel: () => es.close() };
 }

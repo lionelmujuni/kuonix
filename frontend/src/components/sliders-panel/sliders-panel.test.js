@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // groups.js this test will catch it.
 // ---------------------------------------------------------------------------
 
-import { GROUPS } from './groups.js';
+import { GROUPS, METHOD_CHANNELS } from './groups.js';
 
 const ALL_BACKEND_IDS = [
   // white balance
@@ -55,6 +55,17 @@ describe('GROUPS — algorithm coverage', () => {
       expect(g.methods.length).toBeGreaterThan(0);
     }
   });
+
+  it('every tab and method override pins a valid histogram channel', () => {
+    const VALID_CHANNELS = ['luma', 'rgb', 'sat', 'hue', 'haze'];
+    for (const g of GROUPS) {
+      expect(VALID_CHANNELS, `Invalid channel on tab: ${g.id}`).toContain(g.channel);
+    }
+    for (const [method, channel] of Object.entries(METHOD_CHANNELS)) {
+      expect(allMapped, `Override for unknown method: ${method}`).toContain(method);
+      expect(VALID_CHANNELS, `Invalid channel for method: ${method}`).toContain(channel);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -69,15 +80,18 @@ vi.mock('../../api/endpoints/correction.js', () => ({
   commit: vi.fn(),
 }));
 
+// state.on / bus.on must return unsubscribe functions — the embedded
+// histogram panel registers listeners on bind() and calls them on destroy().
 vi.mock('../../state.js', () => ({
   get: vi.fn(),
-  on: vi.fn(),
+  on: vi.fn(() => () => {}),
   renameActiveImage: vi.fn(),
   getSelectedPaths: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../bus.js', () => ({
   emit: vi.fn(),
+  on: vi.fn(() => () => {}),
   EVENTS: {
     STAGE_SET_IMAGE: 'kuonix:stage:set-image',
     STAGE_RIPPLE: 'kuonix:stage:ripple',

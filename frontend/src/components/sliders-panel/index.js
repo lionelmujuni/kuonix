@@ -27,7 +27,8 @@ import { listMethods, preview, commit } from "../../api/endpoints/correction.js"
 import { emit, EVENTS } from "../../bus.js";
 import { toast } from "../toast/index.js";
 import { createPanel } from "../panel/index.js";
-import { GROUPS } from "./groups.js";
+import { createHistogramPanel } from "../histogram-panel/index.js";
+import { GROUPS, METHOD_CHANNELS } from "./groups.js";
 
 let openInstance = null;
 
@@ -53,9 +54,9 @@ export async function openSlidersPanel() {
   let lastPreviewUrl = null;
   let dirty = false;          // any slider movement = dirty
   let cleanupFns = [];
+  let histogramPanel = null;
 
   const appBody = document.querySelector(".app-body");
-  const appShell = appBody?.closest(".app-shell");
 
   const panel = createPanel({
     side: "right",
@@ -64,12 +65,13 @@ export async function openSlidersPanel() {
     subtitle: "Direct controls — every move previews live.",
     className: "panel--sliders",
     onClose: () => {
-      // Restore left nav and surrounding UI blur.
+      // Restore the left nav.
       appBody?.classList.remove("nav-collapsed");
-      appShell?.classList.remove("is-adjusting");
       // Tear down listeners.
       for (const fn of cleanupFns) try { fn(); } catch {}
       cleanupFns = [];
+      histogramPanel?.destroy();
+      histogramPanel = null;
       // If we're closing without a commit, restore the baseline so the user
       // doesn't see a stale preview lingering on the stage.
       if (!committed && (lastPreviewUrl || comparing)) {
@@ -83,12 +85,20 @@ export async function openSlidersPanel() {
 
   // Collapse left nav so the full image is visible during adjustments.
   appBody?.classList.add("nav-collapsed");
-  // Blur surrounding UI so the image stage reads clearly during corrections.
-  appShell?.classList.add("is-adjusting");
   // Remove backdrop so corrections are visible on the stage.
   panel.overlay.querySelector(".panel-backdrop")?.classList.add("panel-backdrop--clear");
 
   panel.body.innerHTML = template();
+
+  // OpenCV histogram lives beside the algorithms it reacts to — pinned above
+  // the footer so the curves stay visible while sliders move. The active
+  // channel follows the selected tab/method (setChannel), live estimates ride
+  // the STAGE_SET_IMAGE previews (including the Compare baseline swap), and
+  // accurate channels refetch when an edit is committed.
+  histogramPanel = createHistogramPanel({ defaultOpen: true });
+  panel.body.insertBefore(histogramPanel.el, panel.body.querySelector(".sliders__footer"));
+  histogramPanel.bind();
+
   panel.open();
 
   // Tabs are clickable immediately; method list + sliders fill in once
@@ -122,6 +132,8 @@ export async function openSlidersPanel() {
   function switchTab(tabId) {
     const group = GROUPS.find((g) => g.id === tabId);
     if (!group) return;
+    // Show the histogram channel this family of algorithms manipulates.
+    if (group.channel) histogramPanel?.setChannel(group.channel);
     panel.body.querySelectorAll("[data-tab]").forEach((b) =>
       b.classList.toggle("is-active", b.dataset.tab === tabId));
     if (!isReduced) {
@@ -185,6 +197,9 @@ export async function openSlidersPanel() {
     const m = methods.find((mm) => mm.id === id);
     if (!m) return;
     activeMethodId = id;
+    const methodGroup = GROUPS.find((g) => g.methods.includes(id));
+    const channel = METHOD_CHANNELS[id] || methodGroup?.channel;
+    if (channel) histogramPanel?.setChannel(channel);
     dirty = true;
     params = {};
     for (const p of m.parameters || []) {

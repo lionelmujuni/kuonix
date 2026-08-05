@@ -191,7 +191,7 @@ function template() {
         <div class="help__modes">
           <div class="help__mode">
             <strong><i class="bi bi-image"></i> Single mode</strong>
-            <p>One image, full ribbon + histogram. The agent works on the active image.</p>
+            <p>One image, full ribbon. The agent works on the active image; the histogram lives in the Adjust panel.</p>
           </div>
           <div class="help__mode">
             <strong><i class="bi bi-images"></i> Batch mode</strong>

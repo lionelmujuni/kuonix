@@ -4,7 +4,7 @@
 // on state.mode and state.images.length, run per-file upload→decode→analyze
 // pipelines, and forward stage events from the bus.
 //
-// Single mode:  ribbon → image stage → histogram strip
+// Single mode:  ribbon → image stage
 // Batch  mode:  group filter → contact sheet
 // Both share the same upload pipeline; the only difference is the layout.
 
@@ -15,13 +15,11 @@ import * as state from "../../state.js";
 import { renderEmptyState, isRawFile } from "./empty-state.js";
 import { createAnalysisRibbon } from "./ribbon.js";
 import { createImageStage } from "./stage.js";
-import { createHistogramStrip } from "./histogram.js";
 import { createContactSheet } from "./contact-sheet.js";
 import { createGroupFilter } from "./group-filter.js";
 import { openSlidersPanel } from "../../components/sliders-panel/index.js";
 import { createExifPanel } from "../../components/exif-panel/index.js";
 import { createStyleProfilePanel } from "../../components/style-profile-panel/index.js";
-import { createHistogramPanel } from "../../components/histogram-panel/index.js";
 
 import { uploadJpeg, uploadRaw, getUrls } from "../../api/endpoints/images.js";
 import { watchDecode, cancelDecodeWatches } from "../../api/decode-poller.js";
@@ -97,15 +95,12 @@ export function unmount() {
 function destroyLayout() {
   if (!layout) return;
   layout.ribbon?.destroy?.();
-  layout.hist?.destroy?.();
-  layout.histogramPanel?.destroy?.();
   layout.exifPanel?.destroy?.();
   layout.styleProfilePanel?.destroy?.();
   layout.contactUnsub?.();
   layout.groupFilter?.destroy?.();
   layout.activeUnsub?.();
   layout.issuesUnsub?.();
-  layout.featuresUnsub?.();
   layout.stateUnsub?.();
   layout.urlUnsub?.();
   layout.adjustUnmagnet?.();
@@ -163,15 +158,6 @@ function mountSingle(view) {
   stage.el.appendChild(adjustBtn);
   const unmagnet = magneticHover(adjustBtn, { strength: 0.3, max: 8 });
 
-  const hist = createHistogramStrip();
-  hist.attach(wrap);
-
-  // OpenCV-backed histogram dropdown (multi-channel + contextual). Sits with the
-  // other collapsible side panels.
-  const histogramPanel = createHistogramPanel();
-  wrap.appendChild(histogramPanel.el);
-  histogramPanel.bind();
-
   let exifPanel = null;
   if (window.__kuonixConfig?.modules?.cameraFeedback) {
     exifPanel = createExifPanel();
@@ -186,11 +172,11 @@ function mountSingle(view) {
     styleProfilePanel.bind();
   }
 
-  layout = { kind: "single", ribbon, stage, hist, histogramPanel, adjustBtn, adjustUnmagnet: unmagnet, exifPanel, styleProfilePanel };
+  layout = { kind: "single", ribbon, stage, adjustBtn, adjustUnmagnet: unmagnet, exifPanel, styleProfilePanel };
 
   if (!isReduced) {
-    gsap.from([stage.el, hist.el], {
-      opacity: 0, y: 12, duration: 0.4, ease: "expo.out", stagger: 0.06,
+    gsap.from(stage.el, {
+      opacity: 0, y: 12, duration: 0.4, ease: "expo.out",
       clearProps: "transform",
     });
   }
@@ -198,29 +184,25 @@ function mountSingle(view) {
   const url = state.get("currentImageUrl");
   if (url) {
     stage.setImage(url);
-    hist.updateFromImageSrc(url);
   } else {
     stage.setPlaceholder("Loading…");
   }
-  if (state.get("currentFeatures")) hist.setMetrics(state.get("currentFeatures"));
   const issues = state.get("currentIssues");
   const st = state.get("analysisState");
   if (st === "ready") ribbon.setIssues(issues || []);
   else if (st === "error") ribbon.setError("Analysis failed.");
   else ribbon.setStatus({ kind: st || "info", text: humanState(st), progress: progressFor(st) });
 
-  // Re-render histogram & ribbon when the active image changes.
+  // Re-render the ribbon when the active image changes.
   layout.activeUnsub = state.on("activeIndex", () => {
     const u = state.get("currentImageUrl");
-    if (u) { stage.setImage(u); hist.updateFromImageSrc(u); }
-    if (state.get("currentFeatures")) hist.setMetrics(state.get("currentFeatures"));
+    if (u) stage.setImage(u);
     const newIssues = state.get("currentIssues");
     if (state.get("analysisState") === "ready") ribbon.setIssues(newIssues || []);
   });
   layout.issuesUnsub = state.on("currentIssues", (newIssues) => {
     if (state.get("analysisState") === "ready") ribbon.setIssues(newIssues || []);
   });
-  layout.featuresUnsub = state.on("currentFeatures", (f) => hist.setMetrics(f || {}));
   layout.stateUnsub = state.on("analysisState", (s) => {
     if (s === "ready") ribbon.setIssues(state.get("currentIssues") || []);
     else if (s === "error") ribbon.setError("Analysis failed.");
@@ -236,7 +218,6 @@ function mountSingle(view) {
     if (!u || u === layout._stageSrc) return;
     layout._stageSrc = u;
     stage.setImage(u);
-    hist.updateFromImageSrc(u);
   });
 }
 
@@ -334,7 +315,6 @@ function bindStageBus() {
       // will see them equal and skip its own crossfade.
       if (layout._stageSrcSetter) layout._stageSrcSetter(src);
       await layout.stage.setImage(src);
-      layout.hist?.updateFromImageSrc?.(src);
     }
     if (path) state.updateImage(path, { url: src });
   }));
@@ -351,7 +331,6 @@ function bindStageBus() {
     if (path) state.setActiveByPath(path);
     if (layout?.kind === "single" && layout.stage && src) {
       await layout.stage.setImage(src);
-      layout.hist?.updateFromImageSrc?.(src);
     }
   }));
 }
@@ -437,7 +416,6 @@ async function pipelineJpegLike(file, tmpPath, setActivePath) {
 
   if (layout?.kind === "single") {
     await layout.stage?.setImage?.(url);
-    layout.hist?.updateFromImageSrc?.(url);
   }
 
   analysisQueue?.enqueue(path);
@@ -463,7 +441,6 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
     state.updateImage(info.previewPath, { url: previewUrl });
     if (layout?.kind === "single") {
       await layout.stage?.setImage?.(previewUrl);
-      layout.hist?.updateFromImageSrc?.(previewUrl);
     }
   }
 
@@ -493,7 +470,6 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
         state.updateImage(fullPath, { url: fullUrl });
         if (layout?.kind === "single") {
           await layout.stage?.setImage?.(fullUrl);
-          layout.hist?.updateFromImageSrc?.(fullUrl);
         }
       }
     }
@@ -507,14 +483,13 @@ async function pipelineRaw(file, tmpPath, setActivePath) {
 }
 
 // Per-image analysis result from the queue. State is already patched by the
-// queue; here we only drive the single-mode ribbon/histogram for the active
-// image and surface failures.
+// queue; here we only drive the single-mode ribbon for the active image and
+// surface failures.
 function onAnalysisResult({ path, ok, error }) {
   if (layout?.kind === "single" && state.get("currentImagePath") === path) {
     const img = state.get("images").find((r) => r.path === path);
     if (ok) {
       layout.ribbon?.setIssues?.(img?.issues || []);
-      layout.hist?.setMetrics?.(img?.features || {});
     } else {
       layout.ribbon?.setError?.(error?.name === "AbortError" ? "Analysis timed out." : "Analysis failed.");
     }

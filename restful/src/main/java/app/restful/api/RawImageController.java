@@ -194,17 +194,8 @@ public class RawImageController {
             String status = task.getStatus();
             if ("complete".equals(status)) {
                 Path outputPath = task.getOutputPath();
-                int width = 0, height = 0;
-                if (outputPath != null) {
-                    Mat mat = opencv_imgcodecs.imread(outputPath.toString());
-                    if (mat != null && !mat.empty()) {
-                        width = mat.cols();
-                        height = mat.rows();
-                        mat.release();
-                    }
-                }
                 events.add(DecodeProgressEvent.complete(
-                    taskId, outputPath != null ? outputPath.toString() : null, width, height));
+                    taskId, outputPath != null ? outputPath.toString() : null));
                 rawService.removeTask(taskId);
             } else if ("error".equals(status)) {
                 events.add(DecodeProgressEvent.error(taskId, task.getError()));

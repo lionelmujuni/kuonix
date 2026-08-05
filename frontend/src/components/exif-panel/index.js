@@ -1,4 +1,4 @@
-// EXIF panel — collapsible strip below the histogram in single-image mode.
+// EXIF panel — collapsible strip below the image stage in single-image mode.
 // Injects its own <style> once on first use.
 
 let stylesInjected = false;

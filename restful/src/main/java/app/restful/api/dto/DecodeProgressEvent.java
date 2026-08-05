@@ -30,6 +30,18 @@ public record DecodeProgressEvent(
     }
     
     /**
+     * Create completion event without dimensions.
+     *
+     * The polling endpoint uses this: reporting width/height meant fully
+     * decoding the full-resolution image on the request thread, and no client
+     * reads either field. Poll responses gate the whole decode→analysis
+     * handoff, so they must stay cheap.
+     */
+    public static DecodeProgressEvent complete(String taskId, String fullPath) {
+        return new DecodeProgressEvent(taskId, "complete", 100, null, fullPath, null, null, null);
+    }
+
+    /**
      * Create error event.
      */
     public static DecodeProgressEvent error(String taskId, String errorMessage) {

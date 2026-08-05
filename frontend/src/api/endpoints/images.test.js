@@ -4,16 +4,10 @@ vi.mock('../client.js', () => ({
   apiJson: vi.fn(),
   apiUploadMultipart: vi.fn(),
 }));
-vi.mock('../sse.js', () => ({
-  postSse: vi.fn(),
-  eventSourceSse: vi.fn(),
-}));
 
 import { apiJson, apiUploadMultipart } from '../client.js';
-import { postSse, eventSourceSse } from '../sse.js';
 import {
-  uploadJpeg, uploadRaw, decodeStream, classify, classifyStream,
-  group, getUrls, getCameraFeedback,
+  uploadJpeg, uploadRaw, classify, group, getUrls, getCameraFeedback,
 } from './images.js';
 
 beforeEach(() => {
@@ -31,27 +25,6 @@ describe('images upload endpoints', () => {
     const files = [new File(['a'], 'a.cr2')];
     uploadRaw(files);
     expect(apiUploadMultipart).toHaveBeenCalledWith('/images/upload-raw', files, 'files');
-  });
-});
-
-describe('images streaming endpoints', () => {
-  it('decodeStream() builds an encoded taskIds query string', () => {
-    const handlers = { onMessage: vi.fn() };
-    decodeStream(['id 1', 'id/2'], handlers);
-    const [url, passedHandlers] = eventSourceSse.mock.calls[0];
-    expect(url).toBe(`/images/decode-stream?taskIds=${encodeURIComponent('id 1')}&taskIds=${encodeURIComponent('id/2')}`);
-    expect(passedHandlers).toBe(handlers);
-  });
-
-  it('classifyStream() posts paths + enableSkin default true', () => {
-    const handlers = {};
-    classifyStream(['/a.jpg'], handlers);
-    expect(postSse).toHaveBeenCalledWith('/images/classify-stream', { paths: ['/a.jpg'], enableSkin: true }, handlers);
-  });
-
-  it('classifyStream() honours an explicit enableSkin false', () => {
-    classifyStream(['/a.jpg'], {}, { enableSkin: false });
-    expect(postSse).toHaveBeenCalledWith('/images/classify-stream', { paths: ['/a.jpg'], enableSkin: false }, {});
   });
 });
 

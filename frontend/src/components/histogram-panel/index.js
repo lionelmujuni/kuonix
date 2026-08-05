@@ -1,4 +1,6 @@
-// Histogram panel — collapsible side dropdown in single-image mode.
+// Histogram panel — collapsible OpenCV histogram readout, mounted inside the
+// Adjust (sliders) panel so the curves sit next to the editing algorithms and
+// update as edits are previewed and committed.
 //
 // Renders OpenCV-computed histograms (fetched from the backend) instead of a
 // browser-side luminance estimate, so the curves match what the analysis /
@@ -7,9 +9,15 @@
 // image carries a matching issue.
 //
 // Hybrid real-time: while an edit is being previewed the active image's data URL
-// changes faster than a round-trip — on the Luma channel we redraw a quick
-// client-side estimate live, then reconcile to the accurate OpenCV data once the
-// edit is applied (the active path changes) and we refetch.
+// changes faster than a round-trip — we redraw quick client-side estimates for
+// every channel live, then reconcile to the accurate OpenCV data once the edit
+// is applied (the active path changes) and we refetch. Because previews AND the
+// Compare baseline swap both ride STAGE_SET_IMAGE, the histogram tracks whatever
+// the stage shows — drag a slider and the curve moves, hold Compare and it
+// snaps back to the original.
+//
+// setChannel(id) lets the Adjust panel pin the channel its active algorithm
+// manipulates (saturation methods → Sat, tone → Luma, dehaze → Haze, …).
 
 import { gsap } from "../../../node_modules/gsap/index.js";
 import { isReduced } from "../../motion.js";
@@ -33,6 +41,8 @@ const CH = {
 const HUE_ISSUE = /^(ColorCast_|Oversaturated_|SkinTone_)/;
 const HAZE_ISSUE = /^Hazy$/;
 
+const CHANNEL_LABELS = { luma: "Luma", rgb: "RGB", sat: "Sat", hue: "Hue", haze: "Haze" };
+
 let stylesInjected = false;
 function injectStyles() {
   if (stylesInjected) return;
@@ -41,6 +51,7 @@ function injectStyles() {
   s.textContent = `
     .histogram-panel {
       border-top: 1px solid var(--color-border); background: var(--color-surface);
+      flex-shrink: 0;
     }
     .histogram-panel__toggle {
       width: 100%; display: flex; align-items: center; gap: 8px;
@@ -93,15 +104,17 @@ function injectStyles() {
   document.head.appendChild(s);
 }
 
-export function createHistogramPanel() {
+export function createHistogramPanel({ defaultOpen = false } = {}) {
   injectStyles();
   const root = document.createElement("div");
   root.className = "histogram-panel";
 
-  let expanded = localStorage.getItem(LS_KEY) === "true";
+  const stored = localStorage.getItem(LS_KEY);
+  let expanded = stored === null ? defaultOpen : stored === "true";
   let channel = "luma";
   let data = null;            // last OpenCV histogram payload
-  let liveLuma = null;        // client-side luma estimate during live edits
+  let live = null;            // client-side estimates during live edits (all channels)
+  let liveSeq = 0;            // invalidates stale in-flight estimates
   let unsubs = [];
   let busUnsubs = [];
   let fetchAbort = null;
@@ -160,7 +173,12 @@ export function createHistogramPanel() {
     if (wantsHue(issues))  chans.push({ id: "hue",  label: "Hue" });
     if (wantsHaze(issues)) chans.push({ id: "haze", label: "Haze" });
 
-    if (!chans.some((c) => c.id === channel)) channel = "luma";
+    // A channel pinned by the active editing algorithm stays visible even
+    // when no issue would surface it.
+    if (!chans.some((c) => c.id === channel)) {
+      if (CHANNEL_LABELS[channel]) chans.push({ id: channel, label: CHANNEL_LABELS[channel] });
+      else channel = "luma";
+    }
 
     chanRow.innerHTML = "";
     for (const c of chans) {
@@ -187,10 +205,12 @@ export function createHistogramPanel() {
   async function doFetch(path) {
     fetchAbort?.abort();
     fetchAbort = new AbortController();
-    const advanced = wantsHue(activeIssues()) || wantsHaze(activeIssues());
+    const advanced = wantsHue(activeIssues()) || wantsHaze(activeIssues())
+      || channel === "hue" || channel === "haze";
     try {
       data = await getHistogram(path, { bins: BINS, advanced, signal: fetchAbort.signal });
-      liveLuma = null;        // accurate data supersedes the live estimate
+      live = null;            // accurate data supersedes the live estimates
+      liveSeq++;              // drop any estimate still decoding
       renderChannels();
       draw();
     } catch (err) {
@@ -198,11 +218,12 @@ export function createHistogramPanel() {
     }
   }
 
-  // Quick client-side luma estimate for live preview feedback (Luma channel only).
+  // Quick client-side estimates for live preview feedback (every channel).
   async function pushLive(src) {
-    if (!expanded || channel !== "luma" || !src) return;
-    const bins = await clientLuma(src, BINS);
-    if (bins) { liveLuma = bins; draw(); }
+    if (!expanded || !src) return;
+    const seq = ++liveSeq;
+    const est = await clientHistograms(src, BINS);
+    if (est && seq === liveSeq) { live = est; draw(); }
   }
 
   // ---- drawing ----------------------------------------------------------
@@ -213,6 +234,7 @@ export function createHistogramPanel() {
   }
 
   function draw() {
+    if (!ctx) return;   // jsdom / headless — no 2d context
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.clientWidth || 300;
     const cssH = canvas.clientHeight || 96;
@@ -223,24 +245,27 @@ export function createHistogramPanel() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
 
-    const hasData = data || (channel === "luma" && liveLuma);
-    emptyEl.hidden = !!hasData;
+    const hasData = !!(data || live);
+    emptyEl.hidden = hasData;
     if (!hasData) return;
 
+    // Live estimates win while an edit is being previewed; accurate OpenCV
+    // data takes over once it lands (doFetch clears `live`).
     if (channel === "luma") {
-      drawArea(ctx, cssW, cssH, liveLuma || data.luma, accentRgb());
+      drawArea(ctx, cssW, cssH, live?.luma || data?.luma, accentRgb());
     } else if (channel === "rgb") {
+      const src = live || data;
       drawOverlay(ctx, cssW, cssH, [
-        { bins: data.red,   rgb: CH.red },
-        { bins: data.green, rgb: CH.green },
-        { bins: data.blue,  rgb: CH.blue },
+        { bins: src.red,   rgb: CH.red },
+        { bins: src.green, rgb: CH.green },
+        { bins: src.blue,  rgb: CH.blue },
       ]);
     } else if (channel === "sat") {
-      drawArea(ctx, cssW, cssH, data.saturation, CH.sat);
+      drawArea(ctx, cssW, cssH, live?.saturation || data?.saturation, CH.sat);
     } else if (channel === "hue") {
-      drawHue(ctx, cssW, cssH, data.hue);
+      drawHue(ctx, cssW, cssH, live?.hue || data?.hue);
     } else if (channel === "haze") {
-      drawArea(ctx, cssW, cssH, data.darkChannel, "150, 150, 150");
+      drawArea(ctx, cssW, cssH, live?.darkChannel || data?.darkChannel, "150, 150, 150");
     }
   }
 
@@ -271,7 +296,18 @@ export function createHistogramPanel() {
     if (root.parentElement) root.parentElement.removeChild(root);
   }
 
-  return { el: root, bind, destroy };
+  // Pin the channel the active editing algorithm manipulates.
+  function setChannel(id) {
+    if (!CHANNEL_LABELS[id] || id === channel) return;
+    channel = id;
+    renderChannels();
+    if ((id === "hue" || id === "haze") && data && !data[id === "hue" ? "hue" : "darkChannel"]) {
+      refetch();   // core-only payload lacks the advanced channels
+    }
+    draw();
+  }
+
+  return { el: root, bind, destroy, setChannel };
 }
 
 // ---- canvas primitives --------------------------------------------------
@@ -358,8 +394,10 @@ function animate(ctx, w, h, heights, finalDraw) {
   });
 }
 
-// Browser-side luminance histogram for instant live feedback (Rec.709).
-function clientLuma(src, binCount) {
+// Browser-side histograms for instant live feedback — one pixel pass computes
+// every channel (Rec.709 luma, R/G/B, HSV saturation + hue, dark channel) so
+// whichever curve the algorithm pinned moves with the preview.
+function clientHistograms(src, binCount) {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -375,12 +413,34 @@ function clientLuma(src, binCount) {
       oc.drawImage(img, 0, 0, w, hh);
       let pix;
       try { pix = oc.getImageData(0, 0, w, hh).data; } catch { resolve(null); return; }
-      const bins = new Array(binCount).fill(0);
+
+      const zeros = () => new Array(binCount).fill(0);
+      const luma = zeros(), red = zeros(), green = zeros(), blue = zeros();
+      const saturation = zeros(), hue = zeros(), darkChannel = zeros();
+      const bin = (v) => Math.min(binCount - 1, Math.floor((v / 256) * binCount));
+
       for (let i = 0; i < pix.length; i += 4) {
-        const y = 0.2126 * pix[i] + 0.7152 * pix[i + 1] + 0.0722 * pix[i + 2];
-        bins[Math.min(binCount - 1, Math.floor((y / 256) * binCount))]++;
+        const r = pix[i], g = pix[i + 1], b = pix[i + 2];
+        luma[bin(0.2126 * r + 0.7152 * g + 0.0722 * b)]++;
+        red[bin(r)]++; green[bin(g)]++; blue[bin(b)]++;
+
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const s = max === 0 ? 0 : (max - min) / max;
+        saturation[Math.min(binCount - 1, Math.floor(s * binCount))]++;
+        darkChannel[bin(min)]++;
+
+        // Hue is undefined for grays — skip them so they don't spike bin 0.
+        if (max > min) {
+          const d = max - min;
+          let h;
+          if (max === r)      h = 60 * (((g - b) / d) % 6);
+          else if (max === g) h = 60 * ((b - r) / d + 2);
+          else                h = 60 * ((r - g) / d + 4);
+          if (h < 0) h += 360;
+          hue[Math.min(binCount - 1, Math.floor((h / 360) * binCount))]++;
+        }
       }
-      resolve(bins);
+      resolve({ luma, red, green, blue, saturation, hue, darkChannel });
     };
     img.onerror = () => resolve(null);
     img.src = src;

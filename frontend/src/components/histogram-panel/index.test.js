@@ -45,6 +45,20 @@ describe('createHistogramPanel — structure', () => {
     expect(channels(panel)).toEqual(['Luma', 'RGB', 'Sat']);
     expect(activeChannel(panel)).toBe('Luma');
   });
+
+  it('starts expanded when created with defaultOpen and no stored preference', () => {
+    const p = createHistogramPanel({ defaultOpen: true });
+    expect(p.el.querySelector('.histogram-panel__toggle').getAttribute('aria-expanded')).toBe('true');
+    expect(p.el.querySelector('.histogram-panel__body').hidden).toBe(false);
+    p.destroy();
+  });
+
+  it('a stored collapsed preference wins over defaultOpen', () => {
+    localStorage.setItem('kuonix.histogramPanelOpen', 'false');
+    const p = createHistogramPanel({ defaultOpen: true });
+    expect(p.el.querySelector('.histogram-panel__toggle').getAttribute('aria-expanded')).toBe('false');
+    p.destroy();
+  });
 });
 
 describe('createHistogramPanel — contextual channels', () => {
@@ -65,6 +79,27 @@ describe('createHistogramPanel — contextual channels', () => {
     state.addImage({ path: '/c.jpg', issues: ['Needs_Exposure_Increase'] });
     panel.bind();
     expect(channels(panel)).toEqual(['Luma', 'RGB', 'Sat']);
+  });
+});
+
+describe('createHistogramPanel — setChannel (algorithm-driven)', () => {
+  it('switches the active channel to the one the algorithm manipulates', () => {
+    panel.bind();
+    panel.setChannel('sat');
+    expect(activeChannel(panel)).toBe('Sat');
+  });
+
+  it('surfaces a contextual channel chip even without a matching issue', () => {
+    panel.bind();
+    panel.setChannel('haze');
+    expect(channels(panel)).toContain('Haze');
+    expect(activeChannel(panel)).toBe('Haze');
+  });
+
+  it('ignores unknown channel ids', () => {
+    panel.bind();
+    panel.setChannel('nope');
+    expect(activeChannel(panel)).toBe('Luma');
   });
 });
 

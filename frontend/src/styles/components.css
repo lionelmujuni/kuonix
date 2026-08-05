@@ -956,43 +956,6 @@ button.issue-chip { font-family: inherit; }
   color: var(--color-text-secondary);
 }
 
-/* Histogram strip --------------------------------------------------- */
-.histogram-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-  padding: var(--space-8) var(--space-20) var(--space-12);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-.histogram-strip__canvas {
-  flex: 1;
-  min-width: 0;
-  height: 56px;
-  border-radius: var(--radius-base);
-  background: rgba(127, 127, 127, 0.06);
-  border: 1px solid var(--color-card-border-inner);
-}
-.histogram-strip__metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(80px, auto));
-  gap: var(--space-4) var(--space-12);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-}
-.histogram-strip__metric { display: flex; flex-direction: column; gap: 2px; }
-.histogram-strip__metric .label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--color-text-secondary);
-  opacity: 0.7;
-}
-.histogram-strip__metric .value {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-
 /* =====================================================================
    PANEL SYSTEM — the cohesive principle for sliding panels and modals.
    Every side-anchored surface in Kuonix is built on these classes so
@@ -1027,6 +990,16 @@ button.issue-chip { font-family: inherit; }
 @media (prefers-color-scheme: dark) {
   html:not([data-color-scheme="light"]) .panel-backdrop {
     background: rgba(0, 0, 0, 0.5);
+  }
+}
+/* Dark-mode dim must not re-apply over the clear backdrop — the dark
+   .panel-backdrop rules above out-rank the single-class modifier. */
+[data-color-scheme="dark"] .panel-backdrop--clear {
+  background: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-color-scheme="light"]) .panel-backdrop--clear {
+    background: transparent;
   }
 }
 

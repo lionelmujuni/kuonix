@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   apiJson, apiText, apiUploadMultipart, pingHealth, waitForBackend, ApiError, BASE_URL,
 } from './client.js';
@@ -48,6 +48,76 @@ describe('apiJson', () => {
     expect(opts.method).toBe('POST');
     expect(opts.headers['X-Trace']).toBe('abc');
     expect(opts.headers['Content-Type']).toBe('application/json');
+  });
+});
+
+// Every request carries a deadline. Without one, a fetch that never settled
+// hung its caller forever — the decode poller latched and its images sat at
+// "decoding" for the rest of the session with no error and no analysis.
+describe('apiJson — request deadlines', () => {
+  // A fetch that only settles when its signal aborts: models a stalled backend.
+  function stalledFetch() {
+    return vi.fn((url, opts) => new Promise((_, reject) => {
+      opts.signal.addEventListener(
+        'abort',
+        () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+        { once: true },
+      );
+    }));
+  }
+
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('passes an AbortSignal on every request', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({}));
+    await apiJson('/x');
+    expect(fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('aborts a stalled request once timeoutMs elapses', async () => {
+    globalThis.fetch = stalledFetch();
+    const rejects = expect(apiJson('/stall', { timeoutMs: 5000 })).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(5000);
+    await rejects;
+    expect(fetch.mock.calls[0][1].signal.reason).toBe('timeout');
+  });
+
+  it('leaves a request in flight until its deadline is actually reached', async () => {
+    globalThis.fetch = stalledFetch();
+    let settled = false;
+    apiJson('/stall', { timeoutMs: 5000 }).catch(() => { settled = true; });
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(settled).toBe(false);
+  });
+
+  it('honours a caller-supplied signal alongside the deadline', async () => {
+    globalThis.fetch = stalledFetch();
+    const ctrl = new AbortController();
+    const rejects = expect(
+      apiJson('/stall', { signal: ctrl.signal, timeoutMs: 60_000 }),
+    ).rejects.toThrow();
+    ctrl.abort('cancelled');
+    await rejects;
+    expect(fetch.mock.calls[0][1].signal.reason).toBe('cancelled');
+  });
+
+  it('does not forward timeoutMs to fetch as a request option', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({}));
+    await apiJson('/x', { timeoutMs: 1234 });
+    expect(fetch.mock.calls[0][1]).not.toHaveProperty('timeoutMs');
+  });
+
+  it('clears its deadline timer when the request succeeds', async () => {
+    fetch.mockResolvedValueOnce(jsonResponse({ ok: true }));
+    await apiJson('/x');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('clears its deadline timer when the request fails', async () => {
+    fetch.mockResolvedValueOnce(textResponse('boom', { status: 500 }));
+    await expect(apiJson('/fail')).rejects.toBeInstanceOf(ApiError);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

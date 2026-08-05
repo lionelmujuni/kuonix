@@ -1,8 +1,6 @@
 package app.restful.services;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -14,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
@@ -71,6 +70,25 @@ public class RawProcessingService {
 
     private final Semaphore previewSlots = new Semaphore(MAX_CONCURRENT_PREVIEWS, true);
     private final Semaphore fullDecodeSlots = new Semaphore(MAX_CONCURRENT_FULL_DECODES, true);
+
+    // Hard ceiling on how long a single dcraw_emu process may run. A corrupt or
+    // truncated RAW can make LibRaw hang outright, and because a slot above is
+    // only released once the process returns, an unbounded wait would drain the
+    // (deliberately small) pools and stall every later decode for the life of
+    // the JVM. The values are generous on purpose: a full-resolution AHD
+    // demosaic of a high-megapixel file on a contended machine is legitimately
+    // slow, and killing a healthy decode is worse than waiting for it.
+    private static final long PREVIEW_DECODE_TIMEOUT_SECONDS = 120;   // half-size, normally < 2s
+    private static final long FULL_DECODE_TIMEOUT_SECONDS = 300;      // full-res AHD, normally < 60s
+
+    // Grace period for the OS to reap a force-killed decode, so the temp-dir
+    // cleanup that follows isn't fighting a still-open file handle.
+    private static final long KILL_REAP_TIMEOUT_SECONDS = 5;
+
+    // dcraw_emu's stderr is spooled here inside the per-decode temp directory.
+    // The extension deliberately isn't .tif/.tiff so the output-file search
+    // below can't mistake it for the decoded image.
+    private static final String STDERR_LOG_NAME = "dcraw-stderr.log";
 
     // Track active decode tasks for SSE progress reporting
     private final Map<String, DecodeTask> activeTasks = new ConcurrentHashMap<>();
@@ -145,27 +163,30 @@ public class RawProcessingService {
             command.add("1");           // sRGB output color space
             command.add(tempRaw.toString());
 
+            Path errLog = tempDir.resolve(STDERR_LOG_NAME);
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(tempDir.toFile()); // Run in temp directory
+            // Spool stderr to a file rather than draining the pipe inline: a
+            // hung dcraw_emu never closes the stream, so an inline reader would
+            // block here and the timeout below would never be reached.
+            pb.redirectError(errLog.toFile());
             // LibRaw's OpenMP otherwise fans each process out across every core
             pb.environment().put("OMP_NUM_THREADS", "1");
-            
+
             log.debug("Executing: {}", String.join(" ", command));
             Process process = pb.start();
-            
-            // Capture stderr for errors
-            StringBuilder errors = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getErrorStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    errors.append(line).append("\n");
-                }
+
+            if (!process.waitFor(PREVIEW_DECODE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                killAndReap(process);
+                log.error("dcraw_emu preview decode timed out after {}s: {}",
+                    PREVIEW_DECODE_TIMEOUT_SECONDS, rawPath.getFileName());
+                throw new IOException("RAW preview decode timed out after "
+                    + PREVIEW_DECODE_TIMEOUT_SECONDS + "s: " + rawPath.getFileName());
             }
-            
-            int exitCode = process.waitFor();
+
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
-                String errorMsg = errors.toString();
+                String errorMsg = readStderr(errLog);
                 log.error("dcraw_emu failed (exit {}): {}", exitCode, errorMsg);
                 throw new IOException("RAW preview decode failed: " + errorMsg);
             }
@@ -287,14 +308,19 @@ public class RawProcessingService {
                 command.add("1");           // sRGB output color space
                 command.add(tempRaw.toString());
 
+                Path errLog = tempDir.resolve(STDERR_LOG_NAME);
                 ProcessBuilder pb = new ProcessBuilder(command);
                 pb.directory(tempDir.toFile()); // Run in temp directory
+                // Spool stderr to a file rather than draining the pipe inline —
+                // see decodePreview: an inline reader blocks forever on a hung
+                // process and would defeat the timeout below.
+                pb.redirectError(errLog.toFile());
                 // LibRaw's OpenMP otherwise fans each process out across every core
                 pb.environment().put("OMP_NUM_THREADS", "2");
-                
+
                 log.debug("Executing: {}", String.join(" ", command));
                 finalTask.setProgress(20);
-                
+
                 Process process = pb.start();
                 
                 // Monitor process with progress estimation
@@ -313,21 +339,26 @@ public class RawProcessingService {
                 });
                 progressMonitor.start();
                 
-                // Capture stderr
-                StringBuilder errors = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getErrorStream()))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        errors.append(line).append("\n");
-                    }
+                boolean finished;
+                try {
+                    finished = process.waitFor(FULL_DECODE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                } finally {
+                    progressMonitor.interrupt();
                 }
-                
-                int exitCode = process.waitFor();
-                progressMonitor.interrupt();
-                
+
+                if (!finished) {
+                    killAndReap(process);
+                    log.error("dcraw_emu full decode timed out after {}s: {}",
+                        FULL_DECODE_TIMEOUT_SECONDS, rawPath.getFileName());
+                    finalTask.setStatus("error");
+                    finalTask.setError("RAW decode timed out after " + FULL_DECODE_TIMEOUT_SECONDS + "s");
+                    throw new IOException("RAW full decode timed out after "
+                        + FULL_DECODE_TIMEOUT_SECONDS + "s: " + rawPath.getFileName());
+                }
+
+                int exitCode = process.exitValue();
                 if (exitCode != 0) {
-                    String errorMsg = errors.toString();
+                    String errorMsg = readStderr(errLog);
                     log.error("dcraw_emu failed (exit {}): {}", exitCode, errorMsg);
                     finalTask.setStatus("error");
                     finalTask.setError("RAW decode failed: " + errorMsg);
@@ -411,6 +442,32 @@ public class RawProcessingService {
         }
     }
     
+    /**
+     * Force-kill a decode that overran its timeout and wait briefly for the OS
+     * to reap it, so the caller's temp-directory cleanup isn't racing an open
+     * file handle. Best-effort: a reap that doesn't land in time is logged, not
+     * thrown, because the caller is already reporting the timeout itself.
+     */
+    private void killAndReap(Process process) throws InterruptedException {
+        process.destroyForcibly();
+        if (!process.waitFor(KILL_REAP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            log.warn("Killed dcraw_emu process did not exit within {}s", KILL_REAP_TIMEOUT_SECONDS);
+        }
+    }
+
+    /**
+     * Read the stderr dcraw_emu spooled for a failed decode. Never throws — the
+     * result only decorates an error that is already being reported.
+     */
+    private String readStderr(Path errLog) {
+        try {
+            return Files.exists(errLog) ? Files.readString(errLog).trim() : "";
+        } catch (IOException e) {
+            log.debug("Could not read dcraw_emu stderr log {}: {}", errLog, e.getMessage());
+            return "";
+        }
+    }
+
     /**
      * Convert TIFF to JPEG using OpenCV for storage efficiency.
      * RAW TIFFs can be 50-100MB; JPEGs are 5-10MB with minimal quality loss.
